@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
-import { FiBook, FiMessageSquare, FiAward, FiTrendingUp } from "react-icons/fi";
+import { FiBook } from "react-icons/fi";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();

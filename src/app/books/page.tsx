@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { BooksClient } from "@/components/BooksClient";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "书库 / Book Library — BookShare",
+};
+
+export const revalidate = 120;
 
 async function getBooks(query: string, genre: string) {
   try {

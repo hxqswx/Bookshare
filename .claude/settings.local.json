@@ -6,7 +6,21 @@
       "Bash(git init *)",
       "Bash(git branch *)",
       "Bash(git remote *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git config *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "mcp__6e834c4d-e14b-45b2-9a30-9994a3035912__deploy_to_vercel",
+      "Bash(vercel --version)",
+      "Bash(npx vercel *)",
+      "mcp__6e834c4d-e14b-45b2-9a30-9994a3035912__list_teams",
+      "mcp__6e834c4d-e14b-45b2-9a30-9994a3035912__list_projects",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(node -e \"const pkg=require\\('./package.json'\\); console.log\\('next:', pkg.dependencies.next\\)\")",
+      "Bash(node -e \"const v=require\\('./node_modules/next/package.json'\\).version; console.log\\(v\\)\")",
+      "Bash(Remove-Item next.config.ts -ErrorAction SilentlyContinue)"
     ]
   }
 }

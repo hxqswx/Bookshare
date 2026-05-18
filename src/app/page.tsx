@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { HomeClient } from "@/components/HomeClient";
 
+export const revalidate = 60; // revalidate every 60 seconds
+
 async function getStats() {
   try {
     const [bookCount, userCount, postCount, recentPosts, featuredBooks] =

@@ -50,14 +50,10 @@ function SharePageContent() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    fetchBooks();
-    fetchPosts(1, true);
-  }, []);
-
   const fetchBooks = async () => {
     try {
-      const res = await fetch("/api/books?page=1");
+      // fetch up to 100 books for the dropdown
+      const res = await fetch("/api/books?page=1&limit=100");
       const data = await res.json();
       setBooks(data.books || []);
     } catch {}
@@ -75,6 +71,12 @@ function SharePageContent() {
       setHasMore(p < data.pages);
     } catch {}
   };
+
+  useEffect(() => {
+    fetchBooks();
+    fetchPosts(1, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

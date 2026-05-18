@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import { FiSearch, FiBook, FiUsers, FiMessageSquare, FiPlus, FiX } from "react-icons/fi";
 import toast from "react-hot-toast";
+import { BookCover } from "@/components/BookCover";
 
 interface Book {
   id: string;
@@ -190,11 +190,10 @@ export function BooksClient({
               >
                 <Link href={`/books/${book.id}`} className="group block">
                   <div className="relative aspect-[2/3] rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:-translate-y-2 book-shadow">
-                    <Image
-                      src={book.cover || `https://via.placeholder.com/200x300/f19340/ffffff?text=${encodeURIComponent(book.title)}`}
+                    <BookCover
+                      src={book.cover}
                       alt={book.titleZh || book.title}
-                      fill
-                      className="object-cover"
+                      title={book.titleZh || book.title}
                     />
                     {book.genre && (
                       <div className="absolute top-2 left-2">

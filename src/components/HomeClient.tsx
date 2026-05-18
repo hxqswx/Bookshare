@@ -2,18 +2,17 @@
 
 import { useLanguage } from "@/context/LanguageContext";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   FiBook,
   FiUsers,
   FiMessageSquare,
   FiHeart,
-  FiAward,
   FiArrowRight,
   FiTrendingUp,
 } from "react-icons/fi";
 import { formatDistanceToNow } from "@/lib/utils";
+import { BookCover } from "@/components/BookCover";
 
 interface HomeData {
   stats: { bookCount: number; userCount: number; postCount: number };
@@ -191,12 +190,10 @@ export function HomeClient({ data }: { data: HomeData }) {
               <motion.div key={book.id} variants={fadeUp}>
                 <Link href={`/books/${book.id}`} className="group block">
                   <div className="relative aspect-[2/3] rounded-xl overflow-hidden shadow-md book-shadow group-hover:shadow-xl transition-all duration-300 group-hover:-translate-y-2">
-                    <Image
-                      src={book.cover || "/placeholder-book.svg"}
+                    <BookCover
+                      src={book.cover}
                       alt={book.titleZh || book.title}
-                      fill
-                      className="object-cover"
-                      onError={() => {}}
+                      title={book.titleZh || book.title}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-end">
                       <p className="text-white text-xs font-medium line-clamp-2">

@@ -1,12 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
-import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import { FiArrowLeft, FiBook, FiUsers, FiStar, FiHeart, FiMessageSquare, FiShare2 } from "react-icons/fi";
 import { formatDistanceToNow } from "@/lib/utils";
+import { BookCover } from "@/components/BookCover";
 
 interface Book {
   id: string;
@@ -82,13 +81,8 @@ export function BookDetailClient({ book }: { book: Book }) {
             <div className="flex flex-col sm:flex-row gap-6 -mt-16">
               {/* Cover */}
               <div className="relative w-28 sm:w-36 flex-shrink-0">
-                <div className="aspect-[2/3] rounded-xl overflow-hidden shadow-xl border-4 border-white book-shadow">
-                  <Image
-                    src={book.cover || `https://via.placeholder.com/200x300/f19340/ffffff?text=${encodeURIComponent(book.title)}`}
-                    alt={displayTitle}
-                    fill
-                    className="object-cover"
-                  />
+                <div className="relative aspect-[2/3] rounded-xl overflow-hidden shadow-xl border-4 border-white book-shadow">
+                  <BookCover src={book.cover} alt={displayTitle} title={displayTitle} />
                 </div>
               </div>
 

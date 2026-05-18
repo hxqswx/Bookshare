@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const query = searchParams.get("q") || "";
   const genre = searchParams.get("genre") || "";
   const page = parseInt(searchParams.get("page") || "1");
-  const limit = 12;
+  const limit = Math.min(parseInt(searchParams.get("limit") || "12"), 100);
 
   try {
     const where = {
@@ -53,7 +53,25 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const book = await prisma.book.create({ data: body });
+    const { title, titleZh, author, authorZh, cover, description, descriptionZh, genre, publishYear } = body;
+
+    if (!title?.trim() || !author?.trim()) {
+      return NextResponse.json({ error: "Title and author are required" }, { status: 400 });
+    }
+
+    const book = await prisma.book.create({
+      data: {
+        title: title.trim(),
+        titleZh: titleZh?.trim() || null,
+        author: author.trim(),
+        authorZh: authorZh?.trim() || null,
+        cover: cover?.trim() || null,
+        description: description?.trim() || null,
+        descriptionZh: descriptionZh?.trim() || null,
+        genre: genre?.trim() || null,
+        publishYear: publishYear ? parseInt(String(publishYear)) : null,
+      },
+    });
     return NextResponse.json(book);
   } catch (err) {
     console.error(err);
