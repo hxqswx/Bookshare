@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 import { BookCover } from "@/components/BookCover";
 import { Avatar } from "@/components/Navbar";
 import { formatDistanceToNow } from "@/lib/utils";
 import {
   FiArrowRight, FiBook, FiUsers, FiMessageSquare,
-  FiHeart, FiTrendingUp, FiStar, FiCopy, FiCheck,
+  FiHeart, FiStar, FiCopy, FiCheck, FiZap,
 } from "react-icons/fi";
 import { SiX, SiFacebook, SiWhatsapp, SiWechat, SiTiktok } from "react-icons/si";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 
 type FeaturedBook = {
@@ -100,10 +100,10 @@ export function HomeClient({ data }: { data: HomeData }) {
 
             <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 mb-14">
               {session ? (
-                <Link href="/share" className="btn-brand text-base px-8 py-4 rounded-2xl shadow-brand">
-                  ✍️ {locale === "zh" ? "去分享" : "Share Now"}
+                <a href="#daily-checkin" className="btn-brand text-base px-8 py-4 rounded-2xl shadow-brand">
+                  📖 {locale === "zh" ? "记录今日阅读" : "Log Today's Reading"}
                   <FiArrowRight className="ml-1" />
-                </Link>
+                </a>
               ) : (
                 <Link href="/register" className="btn-brand text-base px-8 py-4 rounded-2xl shadow-brand">
                   {locale === "zh" ? "免费加入" : "Join Free"}
@@ -408,8 +408,8 @@ export function HomeClient({ data }: { data: HomeData }) {
         </div>
       </section>
 
-      {/* ══════════════ ACTIVITY + LEADERBOARD ══════════════ */}
-      <section className="py-24 bg-white">
+      {/* ══════════════ ACTIVITY + LEADERBOARD + DAILY CHECK-IN ══════════════ */}
+      <section id="daily-checkin" className="py-24 bg-white scroll-mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-5 gap-10">
 
           {/* Activity feed — 3 cols */}
@@ -518,28 +518,8 @@ export function HomeClient({ data }: { data: HomeData }) {
               </div>
             </div>
 
-            {/* Join CTA card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="relative overflow-hidden rounded-2xl bg-forest-gradient text-white p-7"
-            >
-              <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/10" />
-              <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-white/10" />
-              <div className="relative">
-                <div className="text-4xl mb-4">📖</div>
-                <h3 className="heading text-xl font-bold mb-2">
-                  {locale === "zh" ? "今天读了多少页？" : "How many pages today?"}
-                </h3>
-                <p className="text-white/70 text-sm mb-5">
-                  {locale === "zh" ? "每天进步1%，365天后提升37倍" : "1% better daily = 37× in a year"}
-                </p>
-                <Link href="/share" className="inline-flex items-center gap-2 bg-white text-forest-700 font-semibold px-4 py-2.5 rounded-xl text-sm hover:shadow-lg transition-all">
-                  {locale === "zh" ? "记录今日阅读" : "Log Today"} <FiArrowRight />
-                </Link>
-              </div>
-            </motion.div>
+            {/* Daily Check-in Widget */}
+            <DailyCheckinWidget locale={locale} session={session} />
           </div>
         </div>
       </section>
@@ -559,9 +539,14 @@ export function HomeClient({ data }: { data: HomeData }) {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {session ? (
-                <Link href="/share" className="btn-brand text-lg px-10 py-4 rounded-2xl shadow-brand">
-                  ✍️ {locale === "zh" ? "去分享" : "Share a Book"}
-                </Link>
+                <>
+                  <a href="#daily-checkin" className="btn-brand text-lg px-10 py-4 rounded-2xl shadow-brand">
+                    📖 {locale === "zh" ? "记录今日阅读" : "Log Today's Reading"}
+                  </a>
+                  <Link href="/share" className="btn-outline text-lg px-10 py-4 rounded-2xl">
+                    ✍️ {locale === "zh" ? "去分享" : "Share a Book"}
+                  </Link>
+                </>
               ) : (
                 <Link href="/register" className="btn-brand text-lg px-10 py-4 rounded-2xl shadow-brand">
                   {locale === "zh" ? "立即免费注册" : "Sign Up Free"}
@@ -622,6 +607,325 @@ export function HomeClient({ data }: { data: HomeData }) {
         </div>
       </footer>
     </div>
+  );
+}
+
+/* ── Daily Check-in Widget ── */
+
+type SessionData = ReturnType<typeof useSession>["data"];
+
+interface LogEntry { date: string; pages: number; note: string }
+
+function heatColor(pages: number): string {
+  if (!pages) return "bg-gray-100";
+  if (pages <= 10) return "bg-brand-200";
+  if (pages <= 25) return "bg-brand-400";
+  if (pages <= 50) return "bg-brand-500";
+  return "bg-forest-500";
+}
+
+function streakMotivation(streak: number, locale: string): string {
+  if (streak === 0) return locale === "zh" ? "今天开始你的阅读打卡吧！" : "Start your reading streak today!";
+  if (streak <= 3)  return locale === "zh" ? `好的开始！已连续 ${streak} 天 🌱` : `Great start! ${streak}-day streak 🌱`;
+  if (streak <= 7)  return locale === "zh" ? `太棒了！已连续 ${streak} 天 ✨` : `Amazing! ${streak}-day streak ✨`;
+  if (streak <= 14) return locale === "zh" ? `势不可挡！已连续 ${streak} 天 🔥` : `On fire! ${streak}-day streak 🔥`;
+  if (streak <= 30) return locale === "zh" ? `阅读达人！已连续 ${streak} 天 🔥🔥` : `Reading master! ${streak} days 🔥🔥`;
+  return locale === "zh" ? `超级书虫！已连续 ${streak} 天 🔥🔥🔥` : `Bookworm legend! ${streak} days 🔥🔥🔥`;
+}
+
+function DailyCheckinWidget({ locale, session }: { locale: string; session: SessionData }) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [logs, setLogs]         = useState<Map<string, number>>(new Map());
+  const [inputPages, setInputPages] = useState("");
+  const [inputNote, setInputNote]   = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [saveMsg, setSaveMsg]   = useState("");
+  const [loaded, setLoaded]     = useState(false);
+
+  // Fetch current month's logs
+  useEffect(() => {
+    if (!session) return;
+    const now = new Date();
+    fetch(`/api/reading-log?year=${now.getUTCFullYear()}&month=${now.getUTCMonth() + 1}`)
+      .then(r => r.json())
+      .then((data: LogEntry[]) => {
+        const map = new Map<string, number>();
+        for (const l of data) {
+          map.set(l.date, l.pages);
+          if (l.date === todayStr) {
+            setInputPages(String(l.pages));
+            setInputNote(l.note ?? "");
+          }
+        }
+        setLogs(map);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, [session, todayStr]);
+
+  // Streak: consecutive days ending today
+  const streak = useMemo(() => {
+    let s = 0;
+    const d = new Date();
+    for (let i = 0; i < 31; i++) {
+      const key = d.toISOString().slice(0, 10);
+      if ((logs.get(key) ?? 0) > 0) { s++; d.setUTCDate(d.getUTCDate() - 1); }
+      else break;
+    }
+    return s;
+  }, [logs]);
+
+  // Last 7 days for mini heatmap
+  const last7 = useMemo(() => Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 6 + i);
+    const key = d.toISOString().slice(0, 10);
+    const dayNames = locale === "zh"
+      ? ["日","一","二","三","四","五","六"]
+      : ["Su","Mo","Tu","We","Th","Fr","Sa"];
+    return { key, label: dayNames[d.getUTCDay()], pages: logs.get(key) ?? 0, isToday: key === todayStr };
+  }), [logs, todayStr, locale]);
+
+  const monthPages  = useMemo(() => Array.from(logs.values()).reduce((a, b) => a + b, 0), [logs]);
+  const daysLogged  = useMemo(() => Array.from(logs.values()).filter(p => p > 0).length, [logs]);
+  const todayLogged = (logs.get(todayStr) ?? 0) > 0;
+  const todayPages  = logs.get(todayStr) ?? 0;
+
+  const handleCheckin = async () => {
+    const pages = parseInt(inputPages, 10);
+    if (!Number.isInteger(pages) || pages < 1 || pages > 9999) {
+      setSaveMsg(locale === "zh" ? "请输入 1-9999 的数字" : "Enter 1–9999");
+      return;
+    }
+    setSaving(true); setSaveMsg("");
+    try {
+      const res = await fetch("/api/reading-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pages, note: inputNote.trim() || null, date: todayStr }),
+      });
+      if (!res.ok) throw new Error();
+      const log = await res.json() as { date: string; pages: number };
+      setLogs(prev => new Map(prev).set(log.date, log.pages));
+      setSaveMsg(locale === "zh" ? "🎉 打卡成功！" : "🎉 Logged!");
+      setTimeout(() => setSaveMsg(""), 4000);
+    } catch {
+      setSaveMsg(locale === "zh" ? "保存失败，请重试" : "Failed, please retry");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Streak-based accent colour
+  const accentGrad =
+    streak >= 15 ? "from-orange-500 to-red-500" :
+    streak >= 7  ? "from-amber-400 to-orange-500" :
+    streak >= 3  ? "from-brand-400 to-brand-600" :
+                   "from-forest-500 to-forest-700";
+
+  // ── Non-logged-in teaser ──
+  if (!session) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="relative overflow-hidden rounded-2xl bg-forest-gradient text-white p-7"
+      >
+        <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/10" />
+        <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-white/10" />
+        <div className="relative">
+          <div className="text-4xl mb-3">📖</div>
+          <h3 className="heading text-xl font-bold mb-2">
+            {locale === "zh" ? "今天读了多少页？" : "How many pages today?"}
+          </h3>
+          <p className="text-white/70 text-sm mb-5 leading-relaxed">
+            {locale === "zh"
+              ? "每天进步 1%，365 天后提升 37 倍。记录每日阅读，坚持就是胜利。"
+              : "1% better daily = 37× growth in a year. Track your reading streak."}
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <Link href="/register"
+              className="inline-flex items-center gap-1.5 bg-white text-forest-700 font-semibold px-4 py-2.5 rounded-xl text-sm hover:shadow-lg transition-all">
+              {locale === "zh" ? "免费加入" : "Join Free"} <FiArrowRight size={13} />
+            </Link>
+            <Link href="/login"
+              className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-all">
+              {locale === "zh" ? "登录" : "Log In"}
+            </Link>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // ── Logged-in interactive widget ──
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className="rounded-2xl border border-cream-200 overflow-hidden shadow-sm bg-white"
+    >
+      {/* Coloured header strip */}
+      <div className={`bg-gradient-to-r ${accentGrad} px-5 py-4 text-white`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{streak >= 7 ? "🔥" : streak >= 3 ? "✨" : "📖"}</span>
+            <div>
+              <p className="font-bold text-sm leading-tight">
+                {locale === "zh" ? "每日打卡" : "Daily Reading Log"}
+              </p>
+              <p className="text-white/80 text-[11px]">
+                {new Date().toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", { month: "long", day: "numeric" })}
+              </p>
+            </div>
+          </div>
+          {/* Streak badge */}
+          {streak > 0 && (
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: [1, 1.08, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}
+              className="text-center bg-white/20 rounded-xl px-3 py-1.5"
+            >
+              <p className="text-lg font-black leading-none">{streak}</p>
+              <p className="text-[10px] text-white/80 leading-none mt-0.5">
+                {locale === "zh" ? "天连续" : "day streak"}
+              </p>
+            </motion.div>
+          )}
+        </div>
+        <p className="text-white/90 text-xs mt-2 font-medium">
+          {streakMotivation(streak, locale)}
+        </p>
+      </div>
+
+      <div className="px-5 py-4 space-y-4">
+        {/* Mini week heatmap */}
+        <div>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            {locale === "zh" ? "本周打卡" : "This week"}
+          </p>
+          <div className="flex gap-1.5">
+            {last7.map(({ key, label, pages, isToday }) => (
+              <div key={key} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  title={pages ? `${pages}${locale === "zh" ? "页" : " pages"}` : undefined}
+                  className={`
+                    w-full aspect-square rounded-md transition-all
+                    ${heatColor(pages)}
+                    ${isToday ? "ring-2 ring-offset-1 ring-brand-500" : ""}
+                  `}
+                />
+                <span className={`text-[9px] font-semibold ${isToday ? "text-brand-600" : "text-gray-400"}`}>
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Today status banner */}
+        <AnimatePresence mode="wait">
+          {loaded && todayLogged && (
+            <motion.div
+              key="logged"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex items-center gap-2 bg-forest-50 border border-forest-100 rounded-xl px-3 py-2"
+            >
+              <span className="text-forest-500 text-base">✅</span>
+              <p className="text-xs font-semibold text-forest-700">
+                {locale === "zh"
+                  ? `今日已读 ${todayPages} 页`
+                  : `Today: ${todayPages} pages logged`}
+              </p>
+              <span className="ml-auto text-[10px] text-forest-400">
+                {locale === "zh" ? "可更新" : "tap to update"}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Input form */}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type="number"
+                min={1}
+                max={9999}
+                value={inputPages}
+                onChange={e => setInputPages(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleCheckin()}
+                placeholder={locale === "zh" ? "今天读了几页？" : "Pages read today"}
+                className="w-full px-3 py-2.5 border border-cream-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white transition-shadow pr-10"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-300">
+                {locale === "zh" ? "页" : "pg"}
+              </span>
+            </div>
+            <button
+              onClick={handleCheckin}
+              disabled={saving || !inputPages}
+              className={`
+                flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition-all
+                bg-gradient-to-r ${accentGrad} text-white
+                hover:opacity-90 active:scale-95
+                disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100
+              `}
+            >
+              {saving
+                ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
+                : (locale === "zh" ? (todayLogged ? "更新" : "打卡") : (todayLogged ? "Update" : "Log"))}
+            </button>
+          </div>
+          <input
+            type="text"
+            value={inputNote}
+            onChange={e => setInputNote(e.target.value)}
+            placeholder={locale === "zh" ? "备注（选填）：今天读了什么…" : "Note (optional): what did you read…"}
+            maxLength={200}
+            className="w-full px-3 py-2 border border-cream-200 rounded-xl text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white transition-shadow placeholder-gray-300"
+          />
+        </div>
+
+        {/* Save message */}
+        <AnimatePresence>
+          {saveMsg && (
+            <motion.p
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className={`text-sm font-semibold ${saveMsg.startsWith("🎉") ? "text-forest-600" : "text-red-500"}`}
+            >
+              {saveMsg}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        {/* Monthly stats */}
+        <div className="flex items-center justify-between pt-1 border-t border-cream-100">
+          <div className="flex gap-4">
+            <div className="text-center">
+              <p className="text-base font-bold text-forest-800">{monthPages}</p>
+              <p className="text-[10px] text-gray-400">{locale === "zh" ? "本月页数" : "pages/mo"}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-base font-bold text-forest-800">{daysLogged}</p>
+              <p className="text-[10px] text-gray-400">{locale === "zh" ? "打卡天数" : "days"}</p>
+            </div>
+          </div>
+          <Link href="/profile"
+            className="text-[11px] text-brand-500 hover:text-brand-600 font-semibold flex items-center gap-0.5 transition-colors">
+            {locale === "zh" ? "查看完整记录" : "Full history"}
+            <FiArrowRight size={10} />
+          </Link>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
