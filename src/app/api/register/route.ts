@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendVerificationEmail } from "@/lib/email";
+import { isEmailConfigured, sendVerificationEmail } from "@/lib/email";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const emailVerification = isEmailConfigured();
 
     const existing = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -30,34 +31,63 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       if (existing.emailVerified) {
-        // Fully registered — tell the user
         return NextResponse.json({ error: "Email already registered" }, { status: 409 });
       }
-      // Registered but not yet verified — resend verification email
-      await sendNewToken(existing.id, normalizedEmail, name.trim());
-      return NextResponse.json({ needsVerification: true, email: normalizedEmail });
+      // Already registered but not verified — resend if email is configured
+      if (emailVerification) {
+        await sendNewToken(existing.id, normalizedEmail, name.trim());
+        return NextResponse.json({ needsVerification: true, email: normalizedEmail });
+      }
+      // Email not configured — just auto-verify now
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { emailVerified: new Date() },
+      });
+      return NextResponse.json({ needsVerification: false, email: normalizedEmail });
     }
 
     const hashed = await bcrypt.hash(password, 12);
 
+    if (!emailVerification) {
+      // Resend not configured — create user as already verified
+      const user = await prisma.user.create({
+        data: {
+          name: name.trim(),
+          email: normalizedEmail,
+          password: hashed,
+          image: avatarUrl(name.trim()),
+          emailVerified: new Date(), // auto-verify
+        },
+      });
+      return NextResponse.json(
+        { needsVerification: false, email: user.email },
+        { status: 201 }
+      );
+    }
+
+    // Email configured — create unverified user, send verification email
     const user = await prisma.user.create({
       data: {
         name: name.trim(),
         email: normalizedEmail,
         password: hashed,
-        image: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name.trim())}&backgroundType=gradientLinear`,
-        // emailVerified stays null — user must click the link
+        image: avatarUrl(name.trim()),
+        // emailVerified stays null
       },
     });
 
-    // Send verification email; if it fails, clean up the user so they can retry
     try {
       await sendNewToken(user.id, normalizedEmail, name.trim());
     } catch (emailErr) {
-      await prisma.user.delete({ where: { id: user.id } }).catch(() => {});
+      // Email send failed — keep the user account but report the error.
+      // They can retry via /check-email resend button once the issue is fixed.
       console.error("Failed to send verification email:", emailErr);
       return NextResponse.json(
-        { error: "无法发送验证邮件，请稍后重试。Could not send verification email, please try again later." },
+        {
+          error:
+            `账号已创建，但验证邮件发送失败。请稍后在登录页点击“重新发送验证邮件”。` +
+            ` Account created but verification email failed. Please try resending from the login page.`,
+        },
         { status: 503 }
       );
     }
@@ -72,9 +102,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** Delete old token(s) for this user, create a fresh one, send the email. */
+function avatarUrl(name: string) {
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundType=gradientLinear`;
+}
+
+/** Delete old tokens for this user, create a fresh one, send the email. */
 async function sendNewToken(userId: string, email: string, name: string) {
-  // Remove any stale tokens for this email
+  void userId; // kept for potential future use (e.g. rate limit by userId)
   await prisma.verificationToken
     .deleteMany({ where: { identifier: email } })
     .catch(() => {});

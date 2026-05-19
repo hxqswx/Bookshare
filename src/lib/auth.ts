@@ -32,6 +32,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 // on first login so existing users are never locked out.
 const VERIFICATION_LAUNCH = new Date("2026-05-19T00:00:00Z");
 
+// Gate is only active when RESEND_API_KEY is present.
+const emailVerificationEnabled = !!process.env.RESEND_API_KEY;
+
 // Email / Password
 providers.push(
   CredentialsProvider({
@@ -58,8 +61,8 @@ providers.push(
       const ok = await bcrypt.compare(credentials.password, user.password);
       if (!ok) return null;
 
-      // Email verification gate
-      if (!user.emailVerified) {
+      // Email verification gate — only active when Resend is configured
+      if (emailVerificationEnabled && !user.emailVerified) {
         if (user.createdAt < VERIFICATION_LAUNCH) {
           // Legacy account — silently stamp emailVerified so they aren't locked out
           await prisma.user.update({

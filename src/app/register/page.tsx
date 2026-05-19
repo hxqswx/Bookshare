@@ -51,8 +51,18 @@ export default function RegisterPage() {
         setLoading(false);
         return;
       }
-      // Registration successful — user must verify email before logging in
-      router.push(`/check-email?email=${encodeURIComponent(form.email.toLowerCase())}`);
+      if (data.needsVerification) {
+        // Email verification required — redirect to "check your inbox" page
+        router.push(`/check-email?email=${encodeURIComponent(form.email.toLowerCase())}`);
+      } else {
+        // No email verification configured — auto sign-in immediately
+        toast.success(locale === "zh" ? "注册成功！" : "Account created!");
+        await signIn("credentials", {
+          email: form.email.toLowerCase(),
+          password: form.password,
+          callbackUrl: "/",
+        });
+      }
     } catch {
       toast.error(locale === "zh" ? "网络错误，请重试" : "Network error, please try again");
       setLoading(false);

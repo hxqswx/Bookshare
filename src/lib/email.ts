@@ -1,5 +1,10 @@
 import { Resend } from "resend";
 
+/** True only when RESEND_API_KEY is present — used to skip verification gracefully */
+export function isEmailConfigured(): boolean {
+  return !!process.env.RESEND_API_KEY;
+}
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FROM =
