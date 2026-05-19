@@ -56,28 +56,25 @@ export function Navbar() {
           </button>
 
           {session ? (
-            <div className="flex items-center gap-2">
-              {/* Avatar dropdown */}
-              <div className="relative group">
-                <button className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl hover:bg-cream-100 transition-colors">
-                  <Avatar name={session.user?.name} size={32} />
-                  <FiChevronDown className="text-gray-400 text-xs group-hover:text-brand-500 transition-colors" />
-                </button>
-                <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-2xl shadow-card-hover border border-cream-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-cream-100">
-                    <p className="text-xs text-gray-400">{locale === "zh" ? "已登录为" : "Signed in as"}</p>
-                    <p className="text-sm font-semibold text-gray-800 truncate">{session.user?.name}</p>
-                  </div>
-                  <Link href="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-600 hover:bg-cream-50 hover:text-forest-600 transition-colors">
-                    👤 {t.nav.profile}
-                  </Link>
-                  <button
-                    onClick={() => signOut({ callbackUrl: "/" })}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
-                  >
-                    🚪 {t.nav.logout}
-                  </button>
+            <div className="relative group">
+              <button className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl hover:bg-cream-100 transition-colors">
+                <Avatar name={session.user?.name} image={session.user?.image} size={32} />
+                <FiChevronDown className="text-gray-400 text-xs group-hover:text-brand-500 transition-colors" />
+              </button>
+              <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-2xl shadow-card-hover border border-cream-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-cream-100">
+                  <p className="text-xs text-gray-400">{locale === "zh" ? "已登录为" : "Signed in as"}</p>
+                  <p className="text-sm font-semibold text-gray-800 truncate">{session.user?.name}</p>
                 </div>
+                <Link href="/profile" className="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-600 hover:bg-cream-50 hover:text-forest-600 transition-colors">
+                  👤 {t.nav.profile}
+                </Link>
+                <button
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  🚪 {t.nav.logout}
+                </button>
               </div>
             </div>
           ) : (
@@ -125,26 +122,48 @@ export function Navbar() {
                   {label}
                 </Link>
               ))}
-              <div className="pt-3 border-t border-cream-100 flex items-center gap-3 flex-wrap">
+
+              <div className="pt-3 border-t border-cream-100 space-y-1">
                 <button
                   onClick={() => setLocale(locale === "zh" ? "en" : "zh")}
                   className="text-sm font-medium text-gray-500 px-3 py-1.5 border border-cream-300 rounded-full"
                 >
                   {locale === "zh" ? "EN" : "中文"}
                 </button>
+
                 {session ? (
-                  <button onClick={() => signOut({ callbackUrl: "/" })} className="text-sm text-red-500 font-medium">
-                    {t.nav.logout}
-                  </button>
+                  <div className="pt-1 space-y-1">
+                    {/* User info row */}
+                    <div className="flex items-center gap-3 px-4 py-2">
+                      <Avatar name={session.user?.name} image={session.user?.image} size={36} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{session.user?.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{session.user?.email}</p>
+                      </div>
+                    </div>
+                    <Link
+                      href="/profile"
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-gray-700 font-medium hover:bg-cream-100 hover:text-forest-600 transition-colors"
+                    >
+                      👤 {t.nav.profile}
+                    </Link>
+                    <button
+                      onClick={() => signOut({ callbackUrl: "/" })}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-red-500 font-medium hover:bg-red-50 transition-colors"
+                    >
+                      🚪 {t.nav.logout}
+                    </button>
+                  </div>
                 ) : (
-                  <>
-                    <Link href="/login" onClick={() => setOpen(false)} className="text-sm font-medium text-gray-600">
+                  <div className="flex items-center gap-3 pt-1">
+                    <Link href="/login" onClick={() => setOpen(false)} className="text-sm font-medium text-gray-600 px-4 py-2">
                       {t.nav.login}
                     </Link>
                     <Link href="/register" onClick={() => setOpen(false)} className="btn-brand text-sm py-2 px-4">
                       {t.nav.register}
                     </Link>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -166,7 +185,32 @@ function NavItem({ href, children }: { href: string; children: React.ReactNode }
   );
 }
 
-export function Avatar({ name, size = 36 }: { name?: string | null; size?: number }) {
+export function Avatar({
+  name,
+  image,
+  size = 36,
+}: {
+  name?: string | null;
+  image?: string | null;
+  size?: number;
+}) {
+  const [imgError, setImgError] = useState(false);
+
+  // Reset error state when image URL changes
+  useEffect(() => { setImgError(false); }, [image]);
+
+  if (image && !imgError) {
+    return (
+      <img
+        src={image}
+        alt={name ?? "Avatar"}
+        style={{ width: size, height: size }}
+        className="rounded-full object-cover flex-shrink-0"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
   const colors = [
     "from-brand-400 to-brand-600",
     "from-forest-400 to-forest-600",

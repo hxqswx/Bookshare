@@ -56,25 +56,45 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: "/login" },
   providers,
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
+        // Initial sign-in
         token.id = user.id;
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: user.id },
-            select: { isAdmin: true },
+            select: { isAdmin: true, name: true, image: true },
           });
           token.isAdmin = dbUser?.isAdmin ?? false;
+          if (dbUser?.name)  token.name  = dbUser.name;
+          if (dbUser?.image !== undefined) token.picture = dbUser.image;
         } catch {
           token.isAdmin = false;
         }
+      }
+      if (trigger === "update") {
+        // Profile edited — re-fetch latest name/image from DB
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { name: true, image: true, isAdmin: true },
+          });
+          if (dbUser) {
+            token.name    = dbUser.name;
+            token.picture = dbUser.image ?? undefined;
+            token.isAdmin = dbUser.isAdmin;
+          }
+        } catch { /* non-fatal */ }
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id as string;
+        session.user.id      = token.id      as string;
         session.user.isAdmin = token.isAdmin as boolean;
+        if (token.name)    session.user.name  = token.name  as string;
+        if (token.picture !== undefined)
+          session.user.image = token.picture as string | null;
       }
       return session;
     },
