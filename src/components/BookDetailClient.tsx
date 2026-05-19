@@ -10,7 +10,7 @@ import {
   FiArrowLeft, FiUsers, FiStar, FiHeart,
   FiMessageSquare, FiShare2, FiCheck, FiX, FiCopy, FiTwitter,
 } from "react-icons/fi";
-import { SiWhatsapp, SiX, SiFacebook, SiWechat } from "react-icons/si";
+import { SiWhatsapp, SiX, SiFacebook, SiWechat, SiTiktok } from "react-icons/si";
 import { formatDistanceToNow } from "@/lib/utils";
 import { BookCover } from "@/components/BookCover";
 import toast from "react-hot-toast";
@@ -71,11 +71,17 @@ function SocialShareTray({
   bookId: string; title: string; author: string; locale: string; onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [douyinCopied, setDouyinCopied] = useState(false);
+  const [showWechatQr, setShowWechatQr] = useState(false);
   const pageUrl = `${SITE_URL}/books/${bookId}`;
   const shareText =
     locale === "zh"
-      ? `我在 BookShare 发现了《${title}》by ${author}，快来看看！`
-      : `Check out "${title}" by ${author} on BookShare!`;
+      ? `我在「我们真的爱读书」发现了《${title}》by ${author}，快来看看！`
+      : `Check out "${title}" by ${author} on 我们真的爱读书!`;
+  const douyinText =
+    locale === "zh"
+      ? `📚 ${shareText}\n\n#读书 #${title} #我们真的爱读书\n\n${pageUrl}`
+      : `📚 ${shareText}\n\n#reading #books #${title}\n\n${pageUrl}`;
 
   const copy = async () => {
     try {
@@ -84,6 +90,16 @@ function SocialShareTray({
       setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
+
+  const copyDouyin = async () => {
+    try {
+      await navigator.clipboard.writeText(douyinText);
+      setDouyinCopied(true);
+      setTimeout(() => setDouyinCopied(false), 2500);
+    } catch {}
+  };
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=${encodeURIComponent(pageUrl)}`;
 
   const PLATFORMS = [
     {
@@ -108,17 +124,9 @@ function SocialShareTray({
       href: `https://wa.me/?text=${encodeURIComponent(shareText + " " + pageUrl)}`,
     },
     {
-      key: "wechat",
-      label: locale === "zh" ? "微信扫一扫" : "WeChat",
-      icon: <SiWechat />,
-      color: "hover:bg-[#07C160] hover:text-white hover:border-[#07C160]",
-      href: `https://qr.alipay.com/ts?charset=utf-8&url=${encodeURIComponent(pageUrl)}`,
-      isQr: true,
-    },
-    {
       key: "weibo",
       label: locale === "zh" ? "微博" : "Weibo",
-      icon: <span className="text-xs font-bold">微博</span>,
+      icon: <span className="text-xs font-bold leading-none">微博</span>,
       color: "hover:bg-[#E6162D] hover:text-white hover:border-[#E6162D]",
       href: `https://service.weibo.com/share/share.php?url=${encodeURIComponent(pageUrl)}&title=${encodeURIComponent(shareText)}`,
     },
@@ -155,7 +163,74 @@ function SocialShareTray({
             <span className="text-xs font-medium">{label}</span>
           </a>
         ))}
+
+        {/* WeChat — QR code popover */}
+        <div className="relative">
+          <button
+            onClick={() => setShowWechatQr(v => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-sm transition-all ${
+              showWechatQr
+                ? "bg-[#07C160] text-white border-[#07C160]"
+                : "border-cream-200 text-gray-600 hover:bg-[#07C160] hover:text-white hover:border-[#07C160]"
+            }`}
+          >
+            <SiWechat className="text-base" />
+            <span className="text-xs font-medium">{locale === "zh" ? "微信" : "WeChat"}</span>
+          </button>
+          <AnimatePresence>
+            {showWechatQr && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 bg-white rounded-2xl shadow-card-hover border border-cream-200 p-3 w-52 text-center"
+              >
+                <p className="text-xs text-gray-500 mb-2">
+                  {locale === "zh" ? "微信扫一扫分享" : "Scan with WeChat"}
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrUrl}
+                  alt="WeChat QR"
+                  width={180}
+                  height={180}
+                  className="rounded-xl mx-auto"
+                />
+                <p className="text-[10px] text-gray-400 mt-2 break-all">{pageUrl}</p>
+                {/* Arrow */}
+                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-cream-200 rotate-45" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Douyin — copy text with hashtags */}
+        <button
+          onClick={copyDouyin}
+          className={`inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-sm transition-all ${
+            douyinCopied
+              ? "bg-black text-white border-black"
+              : "border-cream-200 text-gray-600 hover:bg-black hover:text-white hover:border-black"
+          }`}
+          title={locale === "zh" ? "复制文字，粘贴到抖音发布" : "Copy text to post on Douyin"}
+        >
+          <SiTiktok className="text-base" />
+          <span className="text-xs font-medium">
+            {douyinCopied
+              ? (locale === "zh" ? "已复制！" : "Copied!")
+              : (locale === "zh" ? "抖音" : "Douyin")}
+          </span>
+        </button>
       </div>
+
+      {douyinCopied && (
+        <p className="text-xs text-gray-400 mb-2 bg-gray-50 rounded-xl px-3 py-2 border border-cream-100">
+          {locale === "zh"
+            ? "📋 已复制文字和话题标签，打开抖音粘贴发布吧！"
+            : "📋 Text & hashtags copied — paste into Douyin to post!"}
+        </p>
+      )}
 
       {/* Copy link */}
       <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 border border-cream-100">

@@ -34,7 +34,7 @@ export function Navbar() {
             <span className="text-white text-lg leading-none">📚</span>
           </div>
           <span className="font-serif font-bold text-xl text-forest-800 tracking-tight">
-            BookShare
+            我们真的爱读书
           </span>
         </Link>
 

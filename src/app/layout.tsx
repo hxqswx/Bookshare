@@ -5,31 +5,31 @@ import { Navbar } from "@/components/Navbar";
 import { Toaster } from "react-hot-toast";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://bookshare.vercel.app";
+const SITE_NAME = "我们真的爱读书";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "BookShare — 共读好书，共同成长",
-    template: "%s | BookShare",
+    default: `${SITE_NAME} — 共读好书，共同成长`,
+    template: `%s | ${SITE_NAME}`,
   },
   description:
-    "A bilingual book sharing and reading motivation community. Share your reading, track your progress, motivate each other. / 读书分享与互相促进社区，分享阅读感悟，追踪进度，共同进步。",
-  keywords: ["books", "reading", "share", "community", "书籍", "阅读", "分享", "book club"],
+    "一个双语读书分享社区，分享阅读感悟，追踪进度，共同进步。A bilingual book sharing community — share your reading, track progress, grow together.",
+  keywords: ["books", "reading", "share", "community", "书籍", "阅读", "分享", "book club", "读书"],
   openGraph: {
     type: "website",
-    siteName: "BookShare",
-    title: "BookShare — 共读好书，共同成长",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — 共读好书，共同成长`,
     description:
-      "A bilingual book sharing and reading motivation community for readers who love Chinese and English literature.",
+      "一个双语读书分享社区，分享阅读感悟，追踪进度，共同进步。",
     url: SITE_URL,
     locale: "zh_CN",
     alternateLocale: "en_GB",
   },
   twitter: {
     card: "summary_large_image",
-    title: "BookShare — 共读好书，共同成长",
-    description:
-      "A bilingual book sharing and reading motivation community for readers who love Chinese and English literature.",
+    title: `${SITE_NAME} — 共读好书，共同成长`,
+    description: "一个双语读书分享社区，分享阅读感悟，追踪进度，共同进步。",
   },
 };
 

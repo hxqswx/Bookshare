@@ -3,7 +3,7 @@ import { BooksClient } from "@/components/BooksClient";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "书库 / Book Library — BookShare",
+  title: "书库 / Book Library",
 };
 
 export const revalidate = 120;

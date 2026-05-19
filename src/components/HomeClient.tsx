@@ -8,8 +8,10 @@ import { Avatar } from "@/components/Navbar";
 import { formatDistanceToNow } from "@/lib/utils";
 import {
   FiArrowRight, FiBook, FiUsers, FiMessageSquare,
-  FiHeart, FiTrendingUp, FiStar,
+  FiHeart, FiTrendingUp, FiStar, FiCopy, FiCheck,
 } from "react-icons/fi";
+import { SiX, SiFacebook, SiWhatsapp, SiWechat, SiTiktok } from "react-icons/si";
+import { useState } from "react";
 
 type FeaturedBook = {
   id: string; title: string; titleZh: string | null;
@@ -139,7 +141,7 @@ export function HomeClient({ data }: { data: HomeData }) {
       {/* ══════════════ FEATURES ══════════════ */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionLabel>{locale === "zh" ? "为什么选择 BookShare" : "Why BookShare"}</SectionLabel>
+          <SectionLabel>{locale === "zh" ? "为什么选择我们" : "Why Join Us"}</SectionLabel>
           <h2 className="heading text-4xl font-bold text-center text-forest-900 mb-16">
             {locale === "zh" ? "阅读，不再孤独" : "Reading, Never Alone"}
           </h2>
@@ -559,7 +561,7 @@ export function HomeClient({ data }: { data: HomeData }) {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-2xl">📚</span>
-                <span className="font-serif font-bold text-xl">BookShare</span>
+                <span className="font-serif font-bold text-xl">我们真的爱读书</span>
               </div>
               <p className="text-forest-300 text-sm leading-relaxed">
                 {locale === "zh" ? "共读好书，共同成长。让阅读连接每一个思考的人。"
@@ -584,16 +586,156 @@ export function HomeClient({ data }: { data: HomeData }) {
               <h4 className="font-semibold text-forest-200 mb-4">{locale === "zh" ? "关于" : "About"}</h4>
               <p className="text-sm text-forest-400 leading-relaxed">
                 {locale === "zh"
-                  ? "BookShare 是一个由书迷创建的阅读社区，致力于让每一本好书被更多人发现。"
-                  : "BookShare is a reading community built by book lovers, dedicated to helping great books reach more readers."}
+                  ? "「我们真的爱读书」是一个由书迷创建的阅读社区，致力于让每一本好书被更多人发现。"
+                  : "A reading community built by book lovers, dedicated to helping great books reach more readers."}
               </p>
             </div>
           </div>
+
+          {/* ── Social Share Row ── */}
+          <FooterShareRow locale={locale} />
+
           <div className="border-t border-forest-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-forest-500">© 2025 BookShare. {locale === "zh" ? "保留所有权利。" : "All rights reserved."}</p>
+            <p className="text-xs text-forest-500">© 2026 我们真的爱读书. {locale === "zh" ? "保留所有权利。" : "All rights reserved."}</p>
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+/* ── Footer Social Share Row ── */
+const SITE_URL_HOME =
+  typeof window !== "undefined" ? window.location.origin : "";
+
+function FooterShareRow({ locale }: { locale: string }) {
+  const [copied, setCopied] = useState(false);
+  const [douyinCopied, setDouyinCopied] = useState(false);
+  const [showWechatQr, setShowWechatQr] = useState(false);
+
+  const pageUrl = SITE_URL_HOME || "https://bookshare.vercel.app";
+  const shareText =
+    locale === "zh"
+      ? "推荐一个读书社区「我们真的爱读书」，快来一起读书吧！"
+      : "Join us on 「我们真的爱读书」 — a bilingual reading community!";
+  const douyinText =
+    locale === "zh"
+      ? `📚 ${shareText}\n\n#读书 #阅读 #我们真的爱读书\n\n${pageUrl}`
+      : `📚 ${shareText}\n\n#reading #books\n\n${pageUrl}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=8&color=1a4731&bgcolor=ffffff&data=${encodeURIComponent(pageUrl)}`;
+
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(pageUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+  };
+  const copyDouyin = async () => {
+    try { await navigator.clipboard.writeText(douyinText); setDouyinCopied(true); setTimeout(() => setDouyinCopied(false), 2500); } catch {}
+  };
+
+  const platforms = [
+    {
+      key: "x", icon: <SiX />, label: "X",
+      color: "hover:bg-black hover:border-black",
+      href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(pageUrl)}`,
+    },
+    {
+      key: "facebook", icon: <SiFacebook />, label: "Facebook",
+      color: "hover:bg-[#1877F2] hover:border-[#1877F2]",
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`,
+    },
+    {
+      key: "whatsapp", icon: <SiWhatsapp />, label: "WhatsApp",
+      color: "hover:bg-[#25D366] hover:border-[#25D366]",
+      href: `https://wa.me/?text=${encodeURIComponent(shareText + " " + pageUrl)}`,
+    },
+    {
+      key: "weibo", icon: <span className="text-[11px] font-bold leading-none">微博</span>, label: locale === "zh" ? "微博" : "Weibo",
+      color: "hover:bg-[#E6162D] hover:border-[#E6162D]",
+      href: `https://service.weibo.com/share/share.php?url=${encodeURIComponent(pageUrl)}&title=${encodeURIComponent(shareText)}`,
+    },
+  ];
+
+  return (
+    <div className="border-t border-forest-800 pt-8 pb-6">
+      <p className="text-xs font-semibold text-forest-400 uppercase tracking-widest mb-4 text-center">
+        {locale === "zh" ? "分享给朋友 · 让更多人爱上阅读" : "Share with friends · Spread the love of reading"}
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {/* Standard link-open platforms */}
+        {platforms.map(({ key, icon, label, color, href }) => (
+          <a
+            key={key}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 border border-forest-700 rounded-xl text-forest-300 text-sm transition-all hover:text-white ${color}`}
+          >
+            <span className="text-base leading-none">{icon}</span>
+            <span className="text-xs font-medium">{label}</span>
+          </a>
+        ))}
+
+        {/* WeChat QR */}
+        <div className="relative">
+          <button
+            onClick={() => setShowWechatQr(v => !v)}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-sm transition-all ${
+              showWechatQr
+                ? "bg-[#07C160] text-white border-[#07C160]"
+                : "border-forest-700 text-forest-300 hover:bg-[#07C160] hover:text-white hover:border-[#07C160]"
+            }`}
+          >
+            <SiWechat className="text-base" />
+            <span className="text-xs font-medium">{locale === "zh" ? "微信" : "WeChat"}</span>
+          </button>
+          {showWechatQr && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-20 bg-white rounded-2xl shadow-2xl p-3 w-48 text-center">
+              <p className="text-xs text-gray-500 mb-2">
+                {locale === "zh" ? "微信扫一扫" : "Scan with WeChat"}
+              </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrUrl} alt="QR" width={160} height={160} className="rounded-xl mx-auto" />
+              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-gray-200 rotate-45" />
+            </div>
+          )}
+        </div>
+
+        {/* Douyin */}
+        <button
+          onClick={copyDouyin}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-sm transition-all ${
+            douyinCopied
+              ? "bg-black text-white border-black"
+              : "border-forest-700 text-forest-300 hover:bg-black hover:text-white hover:border-black"
+          }`}
+          title={locale === "zh" ? "复制文字，粘贴到抖音发布" : "Copy text to post on Douyin"}
+        >
+          <SiTiktok className="text-base" />
+          <span className="text-xs font-medium">
+            {douyinCopied ? (locale === "zh" ? "已复制！" : "Copied!") : (locale === "zh" ? "抖音" : "Douyin")}
+          </span>
+        </button>
+
+        {/* Copy link */}
+        <button
+          onClick={copyLink}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 border rounded-xl text-sm transition-all ${
+            copied
+              ? "bg-brand-500 text-white border-brand-500"
+              : "border-forest-700 text-forest-300 hover:bg-brand-500 hover:text-white hover:border-brand-500"
+          }`}
+        >
+          {copied ? <FiCheck className="text-base" /> : <FiCopy className="text-base" />}
+          <span className="text-xs font-medium">
+            {copied ? (locale === "zh" ? "已复制" : "Copied!") : (locale === "zh" ? "复制链接" : "Copy link")}
+          </span>
+        </button>
+      </div>
+
+      {douyinCopied && (
+        <p className="text-xs text-forest-400 text-center mt-3">
+          📋 {locale === "zh" ? "文字和话题已复制，打开抖音粘贴发布吧！" : "Text & hashtags copied — paste into Douyin!"}
+        </p>
+      )}
     </div>
   );
 }
