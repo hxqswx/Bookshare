@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -323,9 +323,49 @@ export function BookDetailClient({ book }: { book: Book }) {
     finished:     book.userBooks.filter(u => u.status === "finished").length,
   });
 
-  const displayTitle  = locale === "zh" ? (book.titleZh  || book.title)  : book.title;
-  const displayAuthor = locale === "zh" ? (book.authorZh || book.author) : book.author;
-  const displayDesc   = locale === "zh" ? (book.descriptionZh || book.description) : book.description;
+  const displayTitle  = (locale === "zh" ? (book.titleZh  || book.title)  : (book.title || book.titleZh))  ?? "";
+  const displayAuthor = (locale === "zh" ? (book.authorZh || book.author) : (book.author || book.authorZh)) ?? "";
+  // Raw description in the preferred locale (may be null if only the other locale exists)
+  const rawDesc = locale === "zh"
+    ? (book.descriptionZh || book.description)
+    : (book.description || book.descriptionZh);
+
+  // Auto-translate description when the preferred locale version is missing
+  const [translatedDesc, setTranslatedDesc]   = useState<string | null>(null);
+  const [translating, setTranslating]         = useState(false);
+  const translateAttempted                     = useRef(false);
+
+  useEffect(() => {
+    // Reset when locale changes
+    setTranslatedDesc(null);
+    translateAttempted.current = false;
+  }, [locale, book.id]);
+
+  useEffect(() => {
+    if (translateAttempted.current) return;
+    // Only translate if we have text but it's the wrong locale
+    const needsTranslation = locale === "zh"
+      ? (!book.descriptionZh && !!book.description)
+      : (!book.description && !!book.descriptionZh);
+    if (!needsTranslation) return;
+
+    const sourceText = (locale === "zh" ? book.description : book.descriptionZh) ?? "";
+    if (!sourceText.trim()) return;
+
+    translateAttempted.current = true;
+    setTranslating(true);
+    fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: sourceText, targetLocale: locale }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.translated) setTranslatedDesc(d.translated); })
+      .catch(() => {})
+      .finally(() => setTranslating(false));
+  }, [locale, book.id, book.description, book.descriptionZh]);
+
+  const displayDesc = translatedDesc ?? rawDesc;
 
   const ratings   = book.userBooks.filter(ub => ub.rating).map(ub => ub.rating!);
   const avgRating = ratings.length
@@ -474,10 +514,26 @@ export function BookDetailClient({ book }: { book: Book }) {
             </div>
 
             {/* Description */}
-            {displayDesc && (
-              <p className="mt-5 text-gray-600 text-sm leading-relaxed bg-cream-50 rounded-2xl p-4 border border-cream-100">
-                {displayDesc}
-              </p>
+            {(displayDesc || translating) && (
+              <div className="mt-5 relative bg-cream-50 rounded-2xl p-4 border border-cream-100">
+                {translating && (
+                  <div className="flex items-center gap-2 text-xs text-brand-500 mb-2">
+                    <span className="w-3 h-3 border-2 border-brand-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    {locale === "zh" ? "AI 翻译中…" : "Translating…"}
+                  </div>
+                )}
+                {translatedDesc && !translating && (
+                  <div className="flex items-center gap-1 text-[10px] text-brand-400 mb-1.5">
+                    <span>✨</span>
+                    <span>{locale === "zh" ? "AI 自动翻译" : "AI translated"}</span>
+                  </div>
+                )}
+                {displayDesc && (
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    {displayDesc}
+                  </p>
+                )}
+              </div>
             )}
 
             {/* ── Actions ── */}
@@ -488,12 +544,12 @@ export function BookDetailClient({ book }: { book: Book }) {
                 <ReadButton book={book} session={session} locale={locale} router={router} />
               )}
 
-              {/* 2. Reading status — segmented control */}
+              {/* 2. Reading status — one row, count embedded in each button */}
               <div>
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
                   {locale === "zh" ? "阅读状态" : "Reading Status"}
                 </p>
-                <div className="flex rounded-2xl border border-cream-200 overflow-hidden bg-gray-50">
+                <div className="grid grid-cols-3 rounded-2xl border border-cream-200 overflow-hidden bg-gray-50">
                   {STATUS_BTNS.map(({ key, emoji, labelZh, labelEn }, idx) => {
                     const isActive = myStatus === key;
                     const isThisLoading = pendingStatus === key ||
@@ -501,9 +557,9 @@ export function BookDetailClient({ book }: { book: Book }) {
                     const isAnyLoading = pendingStatus !== null;
 
                     const activeColors = [
-                      "bg-sky-500 text-white",
-                      "bg-brand-500 text-white",
-                      "bg-forest-600 text-white",
+                      "bg-sky-500 text-white shadow-inner",
+                      "bg-brand-500 text-white shadow-inner",
+                      "bg-forest-600 text-white shadow-inner",
                     ];
 
                     return (
@@ -512,8 +568,8 @@ export function BookDetailClient({ book }: { book: Book }) {
                         onClick={() => handleStatus(isActive ? null : key)}
                         disabled={isAnyLoading || !statusFetched}
                         className={[
-                          "flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-semibold transition-all duration-200",
-                          "disabled:cursor-not-allowed",
+                          "flex flex-col items-center justify-center gap-0.5 py-3.5 transition-all duration-200",
+                          "disabled:cursor-not-allowed select-none",
                           idx > 0 ? "border-l border-cream-200" : "",
                           isActive
                             ? activeColors[idx]
@@ -522,30 +578,23 @@ export function BookDetailClient({ book }: { book: Book }) {
                         ].join(" ")}
                       >
                         {isThisLoading
-                          ? <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          : <span className="text-base leading-none">{emoji}</span>}
-                        <span>{locale === "zh" ? labelZh : labelEn}</span>
+                          ? <span className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mb-1" />
+                          : <span className="text-xl leading-none">{emoji}</span>}
+                        <span className="text-xs font-semibold mt-0.5">
+                          {locale === "zh" ? labelZh : labelEn}
+                        </span>
+                        <span className={`text-base font-bold leading-none mt-0.5 ${isActive ? "opacity-90" : "text-forest-800"}`}>
+                          {statusCounts[key]}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
-                {/* Hint to tap again to deselect */}
                 {myStatus && (
                   <p className="text-[10px] text-gray-400 mt-1.5 text-center">
                     {locale === "zh" ? "再次点击可取消" : "Tap again to remove"}
                   </p>
                 )}
-              </div>
-
-              {/* 3. Reader counts — compact row */}
-              <div className="grid grid-cols-3 gap-2">
-                {STATUS_BTNS.map(({ key, emoji, labelZh, labelEn }) => (
-                  <div key={key} className="flex flex-col items-center py-2.5 bg-gray-50 rounded-xl border border-cream-100">
-                    <span className="text-lg leading-none mb-1">{emoji}</span>
-                    <span className="text-lg font-bold text-forest-800 leading-none">{statusCounts[key]}</span>
-                    <span className="text-[9px] text-gray-400 mt-0.5">{locale === "zh" ? labelZh : labelEn}</span>
-                  </div>
-                ))}
               </div>
 
               {/* 4. Share section */}
