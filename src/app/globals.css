@@ -1,79 +1,95 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 30, 30, 30;
-  --background-start-rgb: 254, 247, 238;
-  --background-end-rgb: 255, 255, 255;
+  --brand:   #E8702A;
+  --forest:  #2D6A4F;
+  --cream:   #FFFDF9;
+  --text:    #1C1507;
+  --muted:   #7C6E5E;
+  --border:  #EDE4D8;
 }
+
+html { scroll-behavior: smooth; }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
-  font-family: 'Inter', 'Noto Sans SC', sans-serif;
+  font-family: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+  background-color: var(--cream);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  .card-hover {
-    @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
-  }
-
-  .gradient-text {
-    @apply bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent;
-  }
-
-  .glass {
-    @apply bg-white/80 backdrop-blur-sm;
-  }
-
-  .book-shadow {
-    box-shadow: 4px 4px 0px rgba(0,0,0,0.1), 8px 8px 0px rgba(238, 117, 25, 0.1);
-  }
+/* ── Typography helpers ───────────────────────────────── */
+.heading {
+  font-family: 'Playfair Display', Georgia, serif;
+  letter-spacing: -0.02em;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-::-webkit-scrollbar-thumb {
-  background: #f19340;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #ee7519;
+.gradient-brand {
+  background: linear-gradient(135deg, #E8702A 0%, #f59142 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* Smooth scroll */
-html {
-  scroll-behavior: smooth;
+.gradient-forest {
+  background: linear-gradient(135deg, #2D6A4F 0%, #4d9f7c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* Line clamp utilities */
-.line-clamp-2 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+/* ── Cards ─────────────────────────────────────────────── */
+.card {
+  @apply bg-white rounded-2xl shadow-card border border-cream-200 transition-all duration-300;
+}
+.card:hover { @apply shadow-card-hover -translate-y-0.5; }
+
+/* ── Buttons ────────────────────────────────────────────── */
+.btn-brand {
+  @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-white
+         bg-brand-gradient shadow-brand transition-all duration-200
+         hover:shadow-lg hover:scale-[1.03] active:scale-[0.98];
+}
+.btn-outline {
+  @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold
+         border-2 border-brand-400 text-brand-600
+         hover:bg-brand-50 transition-all duration-200;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium
+         text-gray-600 hover:bg-cream-100 hover:text-forest-600 transition-all duration-200;
 }
 
-.line-clamp-3 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+/* ── SSO buttons ────────────────────────────────────────── */
+.btn-sso {
+  @apply w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl font-medium
+         border border-[#EDE4D8] bg-white text-gray-700
+         hover:bg-cream-100 hover:border-brand-300 transition-all duration-200 shadow-sm;
 }
+
+/* ── Form inputs ────────────────────────────────────────── */
+.input {
+  @apply w-full px-4 py-3 rounded-xl border border-[#EDE4D8] bg-white text-gray-800
+         placeholder-gray-400 text-sm
+         focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
+         transition-all duration-200;
+}
+
+/* ── Book card ──────────────────────────────────────────── */
+.book-shadow {
+  box-shadow: 4px 4px 0 rgba(0,0,0,.08), 8px 8px 0 rgba(232,112,42,.12);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #f5f0ea; }
+::-webkit-scrollbar-thumb { background: #d4c4b0; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #E8702A; }
+
+/* ── Line clamp ─────────────────────────────────────────── */
+.line-clamp-2 { overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.line-clamp-3 { overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; }
