@@ -8,7 +8,7 @@ import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FiSearch, FiBook, FiUsers, FiMessageSquare, FiPlus, FiX, FiGrid, FiList,
-  FiUploadCloud, FiLink, FiCheck, FiAlertCircle,
+  FiUploadCloud, FiLink, FiCheck, FiAlertCircle, FiMonitor, FiSmartphone,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { BookCover } from "@/components/BookCover";
@@ -25,6 +25,9 @@ interface Book {
   genre: string | null;
   publishYear: number | null;
   isFeatured: boolean;
+  fileUrl: string | null;
+  fileType: string | null;
+  readLink: string | null;
   _count: { userBooks: number; posts: number };
 }
 
@@ -39,20 +42,31 @@ interface BooksData {
   genres: GenreItem[];
 }
 
+/** Derives which reading modes a book supports */
+function bookReadModes(book: Book) {
+  const hasFile = !!book.fileUrl;
+  const isKindle = !!book.readLink && /amazon/i.test(book.readLink);
+  const hasOnlineLink = !!book.readLink && !/amazon/i.test(book.readLink);
+  return { online: hasFile || hasOnlineLink, kindle: isKindle };
+}
+
 export function BooksClient({
   initialData,
   initialQuery,
   initialGenre,
+  initialReadMode,
 }: {
   initialData: BooksData;
   initialQuery: string;
   initialGenre: string;
+  initialReadMode: string;
 }) {
   const { locale, t } = useLanguage();
   const { data: session } = useSession();
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const [genre, setGenre] = useState(initialGenre);
+  const [readMode, setReadMode] = useState(initialReadMode);
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [newBook, setNewBook] = useState({
@@ -74,27 +88,38 @@ export function BooksClient({
       .catch(() => {});
   }, []);
 
+  // Build URL params preserving all active filters
+  const buildParams = (overrides: { q?: string; genre?: string; read?: string }) => {
+    const p = new URLSearchParams();
+    const q = overrides.q ?? query;
+    const g = overrides.genre ?? genre;
+    const r = overrides.read ?? readMode;
+    if (q) p.set("q", q);
+    if (g) p.set("genre", g);
+    if (r) p.set("read", r);
+    return p.toString();
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (genre) params.set("genre", genre);
-    router.push(`/books?${params.toString()}`);
+    router.push(`/books?${buildParams({ q: query })}`);
   };
 
   const handleGenre = (g: string) => {
     const newGenre = g === genre ? "" : g;
     setGenre(newGenre);
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (newGenre) params.set("genre", newGenre);
-    router.push(`/books?${params.toString()}`);
+    router.push(`/books?${buildParams({ genre: newGenre })}`);
+  };
+
+  const handleReadMode = (mode: string) => {
+    const newMode = mode === readMode ? "" : mode;
+    setReadMode(newMode);
+    router.push(`/books?${buildParams({ read: newMode })}`);
   };
 
   const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB (Vercel serverless body limit)
 
   const handleFileUpload = async (file: File) => {
-    // Client-side size guard
     if (file.size > MAX_UPLOAD_BYTES) {
       toast.error(
         locale === "zh"
@@ -136,7 +161,6 @@ export function BooksClient({
     }
     setSubmitting(true);
     try {
-      // Attach reading source based on active tab
       const readLink = sourceTab === "link" || sourceTab === "kindle" ? newBook.readLink : "";
 
       const res = await fetch("/api/books", {
@@ -165,11 +189,12 @@ export function BooksClient({
     }
   };
 
+  const hasActiveFilter = initialQuery || initialGenre || initialReadMode;
+
   return (
     <div className="min-h-screen bg-[#FFFDF9] pb-20">
       {/* Hero Header */}
       <div className="relative bg-gradient-to-br from-forest-700 via-forest-600 to-forest-500 overflow-hidden">
-        {/* Background decoration */}
         <div className="absolute inset-0 pointer-events-none">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="absolute text-4xl opacity-[0.07] select-none"
@@ -230,64 +255,104 @@ export function BooksClient({
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters + View Toggle Row */}
-        <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => handleGenre("")}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
-                genre === ""
-                  ? "bg-forest-600 text-white border-forest-600 shadow-sm"
-                  : "bg-white text-gray-600 border-cream-200 hover:border-forest-300 hover:text-forest-700"
-              }`}
-            >
-              {t.books.all_genres}
-            </button>
-            {initialData.genres.map((g) => (
+        {/* ── Filter area ── */}
+        <div className="flex flex-col gap-3 mb-8">
+
+          {/* Row 1: Genre chips + view toggle */}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex flex-wrap gap-2">
               <button
-                key={g.id}
-                onClick={() => handleGenre(g.name)}
+                onClick={() => handleGenre("")}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
-                  genre === g.name
+                  genre === ""
                     ? "bg-forest-600 text-white border-forest-600 shadow-sm"
                     : "bg-white text-gray-600 border-cream-200 hover:border-forest-300 hover:text-forest-700"
                 }`}
               >
-                {locale === "zh" ? (g.nameZh || g.name) : g.name}
+                {t.books.all_genres}
               </button>
-            ))}
+              {initialData.genres.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => handleGenre(g.name)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
+                    genre === g.name
+                      ? "bg-forest-600 text-white border-forest-600 shadow-sm"
+                      : "bg-white text-gray-600 border-cream-200 hover:border-forest-300 hover:text-forest-700"
+                  }`}
+                >
+                  {locale === "zh" ? (g.nameZh || g.name) : g.name}
+                </button>
+              ))}
+            </div>
+
+            {/* View Toggle */}
+            <div className="flex items-center gap-1 bg-white border border-cream-200 rounded-xl p-1 flex-shrink-0">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-2 rounded-lg transition-colors ${viewMode === "grid" ? "bg-forest-50 text-forest-700" : "text-gray-400 hover:text-gray-600"}`}
+                aria-label="Grid view"
+              >
+                <FiGrid className="text-sm" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 rounded-lg transition-colors ${viewMode === "list" ? "bg-forest-50 text-forest-700" : "text-gray-400 hover:text-gray-600"}`}
+                aria-label="List view"
+              >
+                <FiList className="text-sm" />
+              </button>
+            </div>
           </div>
 
-          {/* View Toggle */}
-          <div className="flex items-center gap-1 bg-white border border-cream-200 rounded-xl p-1 flex-shrink-0">
+          {/* Row 2: Reading-mode availability chips */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-400 font-medium mr-1">
+              {locale === "zh" ? "阅读方式：" : "Available as:"}
+            </span>
             <button
-              onClick={() => setViewMode("grid")}
-              className={`p-2 rounded-lg transition-colors ${viewMode === "grid" ? "bg-forest-50 text-forest-700" : "text-gray-400 hover:text-gray-600"}`}
-              aria-label="Grid view"
+              onClick={() => handleReadMode("online")}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                readMode === "online"
+                  ? "bg-sky-500 text-white border-sky-500 shadow-sm"
+                  : "bg-white text-sky-600 border-sky-200 hover:border-sky-400 hover:bg-sky-50"
+              }`}
             >
-              <FiGrid className="text-sm" />
+              <FiMonitor className="text-[11px]" />
+              {locale === "zh" ? "在线阅读" : "Read Online"}
             </button>
             <button
-              onClick={() => setViewMode("list")}
-              className={`p-2 rounded-lg transition-colors ${viewMode === "list" ? "bg-forest-50 text-forest-700" : "text-gray-400 hover:text-gray-600"}`}
-              aria-label="List view"
+              onClick={() => handleReadMode("kindle")}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                readMode === "kindle"
+                  ? "bg-orange-500 text-white border-orange-500 shadow-sm"
+                  : "bg-white text-orange-600 border-orange-200 hover:border-orange-400 hover:bg-orange-50"
+              }`}
             >
-              <FiList className="text-sm" />
+              <FiSmartphone className="text-[11px]" />
+              Kindle
             </button>
+            {readMode && (
+              <button
+                onClick={() => handleReadMode("")}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors ml-1"
+              >
+                <FiX className="inline mr-0.5" size={11} />
+                {locale === "zh" ? "清除" : "Clear"}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Results count when searching */}
-        {(initialQuery || initialGenre) && (
+        {/* Results count when any filter is active */}
+        {hasActiveFilter && (
           <div className="mb-6 flex items-center gap-2 text-sm text-gray-500">
             <span>{locale === "zh" ? "搜索结果：" : "Results: "}</span>
             <span className="font-semibold text-forest-700">{initialData.books.length}</span>
             <span>{locale === "zh" ? " 本书" : " books"}</span>
-            {(initialQuery || initialGenre) && (
-              <Link href="/books" className="ml-2 text-brand-500 hover:text-brand-600 font-medium">
-                {locale === "zh" ? "× 清除筛选" : "× Clear filters"}
-              </Link>
-            )}
+            <Link href="/books" className="ml-2 text-brand-500 hover:text-brand-600 font-medium">
+              {locale === "zh" ? "× 清除全部筛选" : "× Clear all filters"}
+            </Link>
           </div>
         )}
 
@@ -318,61 +383,81 @@ export function BooksClient({
             variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
           >
-            {initialData.books.map((book) => (
-              <motion.div
-                key={book.id}
-                variants={{ hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } }}
-              >
-                <Link href={`/books/${book.id}`} className="group block">
-                  {/* Cover */}
-                  <div className="relative aspect-[2/3] rounded-2xl overflow-hidden shadow-card group-hover:shadow-card-hover transition-all duration-300 group-hover:-translate-y-2">
-                    <BookCover
-                      src={book.cover}
-                      alt={book.titleZh || book.title}
-                      title={book.titleZh || book.title}
-                    />
-                    {/* Featured badge */}
-                    {book.isFeatured && (
-                      <div className="absolute top-2 right-2">
-                        <span className="px-1.5 py-0.5 bg-amber-400/90 text-white text-[10px] rounded-full backdrop-blur-sm font-bold shadow-sm">
-                          ⭐
-                        </span>
-                      </div>
-                    )}
-                    {/* Genre badge */}
-                    {book.genre && (
-                      <div className="absolute top-2 left-2">
-                        <span className="px-2 py-0.5 bg-black/50 text-white text-[10px] rounded-full backdrop-blur-sm font-medium">
-                          {book.genre}
-                        </span>
-                      </div>
-                    )}
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
-                      <div className="flex items-center gap-3 text-white text-xs">
-                        <span className="flex items-center gap-1">
-                          <FiUsers className="text-[10px]" />
-                          {book._count.userBooks}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <FiMessageSquare className="text-[10px]" />
-                          {book._count.posts}
-                        </span>
+            {initialData.books.map((book) => {
+              const modes = bookReadModes(book);
+              return (
+                <motion.div
+                  key={book.id}
+                  variants={{ hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35 } } }}
+                >
+                  <Link href={`/books/${book.id}`} className="group block">
+                    {/* Cover */}
+                    <div className="relative aspect-[2/3] rounded-2xl overflow-hidden shadow-card group-hover:shadow-card-hover transition-all duration-300 group-hover:-translate-y-2">
+                      <BookCover
+                        src={book.cover}
+                        alt={book.titleZh || book.title}
+                        title={book.titleZh || book.title}
+                      />
+                      {/* Featured badge */}
+                      {book.isFeatured && (
+                        <div className="absolute top-2 right-2">
+                          <span className="px-1.5 py-0.5 bg-amber-400/90 text-white text-[10px] rounded-full backdrop-blur-sm font-bold shadow-sm">
+                            ⭐
+                          </span>
+                        </div>
+                      )}
+                      {/* Genre badge */}
+                      {book.genre && (
+                        <div className="absolute top-2 left-2">
+                          <span className="px-2 py-0.5 bg-black/50 text-white text-[10px] rounded-full backdrop-blur-sm font-medium">
+                            {book.genre}
+                          </span>
+                        </div>
+                      )}
+                      {/* Reading-mode badges */}
+                      {(modes.online || modes.kindle) && (
+                        <div className="absolute bottom-2 left-2 flex gap-1">
+                          {modes.online && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-sky-500/90 text-white text-[9px] rounded-full backdrop-blur-sm font-semibold">
+                              <FiMonitor size={8} />
+                              {locale === "zh" ? "在线" : "Online"}
+                            </span>
+                          )}
+                          {modes.kindle && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-500/90 text-white text-[9px] rounded-full backdrop-blur-sm font-semibold">
+                              <FiSmartphone size={8} />
+                              Kindle
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {/* Hover overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+                        <div className="flex items-center gap-3 text-white text-xs">
+                          <span className="flex items-center gap-1">
+                            <FiUsers className="text-[10px]" />
+                            {book._count.userBooks}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <FiMessageSquare className="text-[10px]" />
+                            {book._count.posts}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  {/* Info */}
-                  <div className="mt-3 px-0.5">
-                    <h3 className="font-semibold text-sm text-forest-900 line-clamp-2 leading-snug group-hover:text-brand-600 transition-colors">
-                      {locale === "zh" ? (book.titleZh || book.title) : book.title}
-                    </h3>
-                    <p className="text-xs text-gray-400 mt-1 line-clamp-1">
-                      {locale === "zh" ? (book.authorZh || book.author) : book.author}
-                    </p>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
+                    {/* Info */}
+                    <div className="mt-3 px-0.5">
+                      <h3 className="font-semibold text-sm text-forest-900 line-clamp-2 leading-snug group-hover:text-brand-600 transition-colors">
+                        {locale === "zh" ? (book.titleZh || book.title) : book.title}
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-1 line-clamp-1">
+                        {locale === "zh" ? (book.authorZh || book.author) : book.author}
+                      </p>
+                    </div>
+                  </Link>
+                </motion.div>
+              );
+            })}
           </motion.div>
         ) : (
           /* List View */
@@ -382,51 +467,68 @@ export function BooksClient({
             variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
             className="space-y-3"
           >
-            {initialData.books.map((book) => (
-              <motion.div
-                key={book.id}
-                variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { duration: 0.3 } } }}
-              >
-                <Link href={`/books/${book.id}`}
-                  className="group flex items-center gap-4 bg-white rounded-2xl p-4 border border-cream-200 hover:border-brand-200 hover:shadow-card transition-all"
+            {initialData.books.map((book) => {
+              const modes = bookReadModes(book);
+              return (
+                <motion.div
+                  key={book.id}
+                  variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { duration: 0.3 } } }}
                 >
-                  <div className="relative w-12 h-18 flex-shrink-0 rounded-lg overflow-hidden shadow-sm" style={{ height: "72px" }}>
-                    <BookCover src={book.cover} alt={book.titleZh || book.title} title={book.titleZh || book.title} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-forest-900 text-sm group-hover:text-brand-600 transition-colors line-clamp-1">
-                        {locale === "zh" ? (book.titleZh || book.title) : book.title}
-                      </h3>
-                      {book.isFeatured && (
-                        <span className="flex-shrink-0 text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold">
-                          ⭐ {locale === "zh" ? "推荐" : "Pick"}
-                        </span>
-                      )}
+                  <Link href={`/books/${book.id}`}
+                    className="group flex items-center gap-4 bg-white rounded-2xl p-4 border border-cream-200 hover:border-brand-200 hover:shadow-card transition-all"
+                  >
+                    <div className="relative w-12 flex-shrink-0 rounded-lg overflow-hidden shadow-sm" style={{ height: "72px" }}>
+                      <BookCover src={book.cover} alt={book.titleZh || book.title} title={book.titleZh || book.title} />
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {locale === "zh" ? (book.authorZh || book.author) : book.author}
-                      {book.publishYear && ` · ${book.publishYear}`}
-                    </p>
-                    {book.genre && (
-                      <span className="inline-block mt-1.5 px-2 py-0.5 bg-forest-50 text-forest-700 text-[10px] rounded-full font-medium">
-                        {book.genre}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-forest-900 text-sm group-hover:text-brand-600 transition-colors line-clamp-1">
+                          {locale === "zh" ? (book.titleZh || book.title) : book.title}
+                        </h3>
+                        {book.isFeatured && (
+                          <span className="flex-shrink-0 text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold">
+                            ⭐ {locale === "zh" ? "推荐" : "Pick"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {locale === "zh" ? (book.authorZh || book.author) : book.author}
+                        {book.publishYear && ` · ${book.publishYear}`}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        {book.genre && (
+                          <span className="px-2 py-0.5 bg-forest-50 text-forest-700 text-[10px] rounded-full font-medium">
+                            {book.genre}
+                          </span>
+                        )}
+                        {modes.online && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-sky-50 text-sky-600 text-[10px] rounded-full font-semibold border border-sky-100">
+                            <FiMonitor size={9} />
+                            {locale === "zh" ? "在线阅读" : "Online"}
+                          </span>
+                        )}
+                        {modes.kindle && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-orange-50 text-orange-600 text-[10px] rounded-full font-semibold border border-orange-100">
+                            <FiSmartphone size={9} />
+                            Kindle
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0">
+                      <span className="flex items-center gap-1">
+                        <FiUsers />
+                        {book._count.userBooks}
                       </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0">
-                    <span className="flex items-center gap-1">
-                      <FiUsers />
-                      {book._count.userBooks}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <FiMessageSquare />
-                      {book._count.posts}
-                    </span>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
+                      <span className="flex items-center gap-1">
+                        <FiMessageSquare />
+                        {book._count.posts}
+                      </span>
+                    </div>
+                  </Link>
+                </motion.div>
+              );
+            })}
           </motion.div>
         )}
       </div>

@@ -8,8 +8,28 @@ export const metadata: Metadata = {
 
 export const revalidate = 120;
 
-async function getBooks(query: string, genre: string) {
+async function getBooks(query: string, genre: string, readMode: string) {
   try {
+    // Reading-mode availability filter
+    let readFilter: object = {};
+    if (readMode === "online") {
+      // Has an uploaded file  OR  has a non-Amazon read link
+      readFilter = {
+        OR: [
+          { fileUrl: { not: null } },
+          {
+            AND: [
+              { readLink: { not: null } },
+              { NOT: { readLink: { contains: "amazon", mode: "insensitive" as const } } },
+            ],
+          },
+        ],
+      };
+    } else if (readMode === "kindle") {
+      // readLink points to Amazon/Kindle store
+      readFilter = { readLink: { contains: "amazon", mode: "insensitive" as const } };
+    }
+
     const where = {
       AND: [
         query
@@ -23,6 +43,7 @@ async function getBooks(query: string, genre: string) {
             }
           : {},
         genre ? { genre: { contains: genre, mode: "insensitive" as const } } : {},
+        readFilter,
       ],
     };
 
@@ -44,10 +65,18 @@ async function getBooks(query: string, genre: string) {
 export default async function BooksPage({
   searchParams,
 }: {
-  searchParams: { q?: string; genre?: string };
+  searchParams: { q?: string; genre?: string; read?: string };
 }) {
   const query = searchParams.q || "";
   const genre = searchParams.genre || "";
-  const data = await getBooks(query, genre);
-  return <BooksClient initialData={data} initialQuery={query} initialGenre={genre} />;
+  const readMode = searchParams.read || "";
+  const data = await getBooks(query, genre, readMode);
+  return (
+    <BooksClient
+      initialData={data}
+      initialQuery={query}
+      initialGenre={genre}
+      initialReadMode={readMode}
+    />
+  );
 }
