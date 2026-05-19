@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { Navbar } from "@/components/Navbar";
+import { SWRegistration } from "@/components/SWRegistration";
 import { Toaster } from "react-hot-toast";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://bookshare.vercel.app";
@@ -16,15 +17,13 @@ export const metadata: Metadata = {
   description:
     "一个双语读书分享社区，分享阅读感悟，追踪进度，共同进步。A bilingual book sharing community — share your reading, track progress, grow together.",
   keywords: ["books", "reading", "share", "community", "书籍", "阅读", "分享", "book club", "读书"],
-  // ── PWA / installability ────────────────────────────────────────────
-  manifest: "/manifest.json",
+  // ── PWA — manifest injected automatically by src/app/manifest.ts ───────
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: SITE_NAME,
-    startupImage: "/icons/icon.svg",
   },
-  // ── Open Graph ──────────────────────────────────────────────────────
+  // ── Open Graph ──────────────────────────────────────────────────────────
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
@@ -39,22 +38,18 @@ export const metadata: Metadata = {
     title: `${SITE_NAME} — 共读好书，共同成长`,
     description: "一个双语读书分享社区，分享阅读感悟，追踪进度，共同进步。",
   },
-  // ── Icons ───────────────────────────────────────────────────────────
+  // ── Icons ────────────────────────────────────────────────────────────────
   icons: {
     icon: [
       { url: "/api/icons/192", sizes: "192x192", type: "image/png" },
       { url: "/api/icons/512", sizes: "512x512", type: "image/png" },
     ],
-    shortcut: "/api/icons/192",
-    // iOS Safari requires a real PNG for the home-screen icon
+    // iOS Safari requires a real PNG apple-touch-icon (ignores manifest icons)
     apple: [{ url: "/api/icons/180", sizes: "180x180", type: "image/png" }],
-    other: [
-      { rel: "mask-icon", url: "/icons/icon.svg", color: "#2d6a4f" },
-    ],
+    other: [{ rel: "mask-icon", url: "/icons/icon.svg", color: "#2d6a4f" }],
   },
 };
 
-// Theme colour and viewport live in `viewport` export (Next 14+)
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#2d6a4f" },
@@ -62,9 +57,9 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,           // prevent auto-zoom on input focus (mobile UX)
+  maximumScale: 1,
   userScalable: false,
-  viewportFit: "cover",      // full-screen on iPhone notch/Dynamic Island
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -75,23 +70,18 @@ export default function RootLayout({
   return (
     <html lang="zh">
       <head>
-        {/* Manifest — hard-coded so it survives any Next.js metadata-API quirks */}
-        <link rel="manifest" href="/manifest.json" />
-
-        {/* iOS home-screen icon (Safari ignores manifest icons) */}
-        <link rel="apple-touch-icon" sizes="180x180" href="/api/icons/180" />
-
-        {/* iOS standalone mode — hide browser chrome */}
+        {/* iOS standalone / home-screen */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content={SITE_NAME} />
-        {/* Windows tile */}
         <meta name="msapplication-TileColor" content="#2d6a4f" />
         <meta name="msapplication-tap-highlight" content="no" />
       </head>
       <body>
         <Providers>
+          {/* Service Worker registration — runs once on client */}
+          <SWRegistration />
           <Navbar />
           <main className="min-h-screen pt-16">{children}</main>
           <Toaster
