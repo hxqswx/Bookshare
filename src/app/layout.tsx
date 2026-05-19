@@ -75,6 +75,12 @@ export default function RootLayout({
   return (
     <html lang="zh">
       <head>
+        {/* Manifest — hard-coded so it survives any Next.js metadata-API quirks */}
+        <link rel="manifest" href="/manifest.json" />
+
+        {/* iOS home-screen icon (Safari ignores manifest icons) */}
+        <link rel="apple-touch-icon" sizes="180x180" href="/api/icons/180" />
+
         {/* iOS standalone mode — hide browser chrome */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
