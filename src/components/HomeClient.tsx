@@ -435,7 +435,7 @@ export function HomeClient({ data }: { data: HomeData }) {
                       className="card p-5"
                     >
                       <div className="flex gap-3">
-                        <Avatar name={post.user.name} size={38} />
+                        <Avatar name={post.user.name} image={post.user.image} size={38} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="font-semibold text-sm text-gray-800">{post.user.name}</span>

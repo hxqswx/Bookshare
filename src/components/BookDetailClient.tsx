@@ -14,6 +14,7 @@ import {
 import { SiWhatsapp, SiX, SiFacebook, SiWechat, SiTiktok } from "react-icons/si";
 import { formatDistanceToNow } from "@/lib/utils";
 import { BookCover } from "@/components/BookCover";
+import { Avatar } from "@/components/Navbar";
 import toast from "react-hot-toast";
 
 interface Book {
@@ -48,13 +49,6 @@ interface Book {
 
 type ReadStatus = "want_to_read" | "reading" | "finished" | null;
 
-const AVATAR_COLORS = [
-  "from-brand-400 to-brand-600", "from-forest-400 to-forest-600",
-  "from-purple-400 to-purple-600", "from-sky-400 to-sky-600",
-  "from-rose-400 to-rose-600", "from-amber-400 to-amber-600",
-];
-const avatarGrad = (name: string) =>
-  AVATAR_COLORS[(name.charCodeAt(0) || 0) % AVATAR_COLORS.length];
 
 const TYPE_CONFIG: Record<string, { labelZh: string; labelEn: string; pill: string; emoji: string }> = {
   review:   { labelZh: "书评", labelEn: "Review",   pill: "bg-purple-50 text-purple-700 border-purple-100", emoji: "⭐" },
@@ -614,9 +608,7 @@ export function BookDetailClient({ book }: { book: Book }) {
                     transition={{ delay: i * 0.05 }}
                     className="bg-white rounded-2xl border border-cream-200 p-5 hover:shadow-card transition-shadow">
                     <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarGrad(post.user.name)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
-                        {post.user.name[0]?.toUpperCase()}
-                      </div>
+                      <Avatar name={post.user.name} image={post.user.image} size={40} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-forest-900 text-sm">{post.user.name}</span>

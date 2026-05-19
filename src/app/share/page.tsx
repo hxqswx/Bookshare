@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
+import { Avatar } from "@/components/Navbar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FiBook,
@@ -42,19 +43,6 @@ interface GenreItem {
   nameZh: string | null;
 }
 
-/* Deterministic image colour from name */
-const AVATAR_COLORS = [
-  "from-brand-400 to-brand-600",
-  "from-forest-400 to-forest-600",
-  "from-purple-400 to-purple-600",
-  "from-sky-400 to-sky-600",
-  "from-rose-400 to-rose-600",
-  "from-amber-400 to-amber-600",
-];
-function imageGradient(name: string) {
-  const code = name.charCodeAt(0) || 0;
-  return AVATAR_COLORS[code % AVATAR_COLORS.length];
-}
 
 const TYPE_CONFIG: Record<string, { emoji: string; labelZh: string; labelEn: string; pill: string }> = {
   share:    { emoji: "💬", labelZh: "分享",   labelEn: "Share",    pill: "bg-sky-50 text-sky-700 border-sky-100" },
@@ -250,9 +238,7 @@ function SharePageContent() {
             <div className="p-5">
               {/* User + type selector */}
               <div className="flex items-start gap-3 mb-4">
-                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${imageGradient(session.user?.name || "U")} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
-                  {session.user?.name?.[0]?.toUpperCase() ?? "U"}
-                </div>
+                <Avatar name={session.user?.name} image={session.user?.image} size={40} />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-forest-900 mb-2">{session.user?.name}</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -392,9 +378,7 @@ function SharePageContent() {
                 >
                   <div className="flex items-start gap-3">
                     {/* Avatar */}
-                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${imageGradient(post.user.name)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
-                      {post.user.name[0]?.toUpperCase()}
-                    </div>
+                    <Avatar name={post.user.name} image={post.user.image} size={40} />
 
                     <div className="flex-1 min-w-0">
                       {/* Header row */}

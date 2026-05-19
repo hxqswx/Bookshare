@@ -65,11 +65,12 @@ export async function POST(req: NextRequest) {
       await issueAndSend(normalizedEmail, trimmedName);
     } catch (err) {
       console.error("Verification email failed:", err);
-      // Account is created — user can try resending from the login page
-      return NextResponse.json(
-        { error: "账号已创建，但验证邮件发送失败，请稍后重试。Account created but verification email failed — please try again later." },
-        { status: 503 }
-      );
+      // Email failed — auto-verify so the user can log in immediately
+      await prisma.user.update({
+        where: { email: normalizedEmail },
+        data: { emailVerified: new Date() },
+      }).catch(() => {});
+      return NextResponse.json({ needsVerification: false, email: normalizedEmail }, { status: 201 });
     }
 
     return NextResponse.json({ needsVerification: true, email: normalizedEmail }, { status: 201 });
