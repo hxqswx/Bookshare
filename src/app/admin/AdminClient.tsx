@@ -8,7 +8,7 @@ import {
   FiUsers, FiTrash2, FiShield, FiShieldOff,
   FiSearch, FiAlertTriangle, FiBook,
   FiMessageSquare, FiHeart, FiStar, FiTag,
-  FiEdit2, FiCheck, FiX, FiPlus,
+  FiEdit2, FiCheck, FiX, FiPlus, FiUploadCloud, FiLink,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 
@@ -20,8 +20,12 @@ interface User {
 }
 interface AdminBook {
   id: string; title: string; titleZh: string | null;
-  author: string; genre: string | null; publishYear: number | null;
+  author: string; authorZh: string | null;
+  cover: string | null;
+  description: string | null; descriptionZh: string | null;
+  genre: string | null; publishYear: number | null;
   isFeatured: boolean;
+  fileUrl: string | null; fileType: string | null; readLink: string | null;
   createdAt: string;
   _count: { userBooks: number; posts: number };
 }
@@ -88,6 +92,18 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
   // Book genre inline edit
   const [bookGenreMap, setBookGenreMap] = useState<Record<string, string>>({});
 
+  // Book full edit modal
+  const [editingBook, setEditingBook] = useState<AdminBook | null>(null);
+  const [editBook, setEditBook] = useState<{
+    title: string; titleZh: string; author: string; authorZh: string;
+    cover: string; description: string; descriptionZh: string;
+    genre: string; publishYear: string;
+    fileUrl: string; fileType: string; readLink: string;
+  } | null>(null);
+  const [editUploadState, setEditUploadState] = useState<"idle"|"uploading"|"done"|"error">("idle");
+  const [editUploadName, setEditUploadName] = useState("");
+  const [bookSaving, setBookSaving] = useState(false);
+
   /* ── Fetch helpers ── */
   const fetchUsers = useCallback(async () => {
     setUL(true);
@@ -128,6 +144,7 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => {
     if (tab === "books"  && !booksFetched)  fetchBooks();
+    if (tab === "books"  && !genresFetched) fetchGenres(); // needed for genre dropdown in books tab
     if (tab === "posts"  && !postsFetched)  fetchPosts();
     if (tab === "genres" && !genresFetched) fetchGenres();
   }, [tab, booksFetched, postsFetched, genresFetched, fetchBooks, fetchPosts, fetchGenres]);
@@ -257,6 +274,75 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
     } finally {
       setBookGenreMap(m => { const n = { ...m }; delete n[bookId]; return n; });
     }
+  };
+
+  /* ── Open / save book edit modal ── */
+  const openEditBook = (book: AdminBook) => {
+    setEditingBook(book);
+    setEditBook({
+      title: book.title, titleZh: book.titleZh ?? "",
+      author: book.author, authorZh: book.authorZh ?? "",
+      cover: book.cover ?? "", description: book.description ?? "",
+      descriptionZh: book.descriptionZh ?? "",
+      genre: book.genre ?? "", publishYear: book.publishYear?.toString() ?? "",
+      fileUrl: book.fileUrl ?? "", fileType: book.fileType ?? "",
+      readLink: book.readLink ?? "",
+    });
+    setEditUploadState("idle");
+    setEditUploadName(book.fileUrl ? (book.fileUrl.split("/").pop() ?? "") : "");
+  };
+
+  const handleEditFileUpload = async (file: File) => {
+    if (!editBook) return;
+    setEditUploadState("uploading");
+    setEditUploadName(file.name);
+    try {
+      const { upload } = await import("@vercel/blob/client");
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+      });
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const typeMap: Record<string, string> = { pdf: "pdf", epub: "epub", txt: "txt" };
+      setEditBook(b => b ? { ...b, fileUrl: blob.url, fileType: typeMap[ext] ?? "pdf" } : b);
+      setEditUploadState("done");
+    } catch (err) {
+      setEditUploadState("error");
+      toast.error(err instanceof Error ? err.message : (locale === "zh" ? "上传失败" : "Upload failed"));
+    }
+  };
+
+  const handleSaveBookEdit = async () => {
+    if (!editingBook || !editBook) return;
+    setBookSaving(true);
+    try {
+      const res = await fetch(`/api/admin/books/${editingBook.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editBook.title,
+          titleZh: editBook.titleZh || null,
+          author: editBook.author,
+          authorZh: editBook.authorZh || null,
+          cover: editBook.cover || null,
+          description: editBook.description || null,
+          descriptionZh: editBook.descriptionZh || null,
+          genre: editBook.genre || null,
+          publishYear: editBook.publishYear ? parseInt(editBook.publishYear) : null,
+          fileUrl: editBook.fileUrl || null,
+          fileType: editBook.fileType || null,
+          readLink: editBook.readLink || null,
+        }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      const updated = await res.json();
+      setBooks(p => p.map(b => b.id === editingBook.id ? { ...b, ...updated } : b));
+      setEditingBook(null);
+      setEditBook(null);
+      toast.success(locale === "zh" ? "书籍已更新" : "Book updated");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : (locale === "zh" ? "保存失败" : "Failed"));
+    } finally { setBookSaving(false); }
   };
 
   /* ── Filter ── */
@@ -409,6 +495,7 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                 locale === "zh" ? "分类（可修改）" : "Genre (editable)",
                 locale === "zh" ? "数据" : "Stats",
                 locale === "zh" ? "推荐" : "Featured",
+                locale === "zh" ? "编辑" : "Edit",
                 locale === "zh" ? "删除" : "Delete",
               ]} />
               {filteredBooks.length === 0 ? <Empty icon={<FiBook />} label={locale === "zh" ? "无书籍" : "No books"} /> : (
@@ -417,7 +504,7 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                     <motion.div key={book.id}
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.02 }}
-                      className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-center px-5 py-3.5 hover:bg-cream-50 transition-colors ${book.isFeatured ? "bg-amber-50/60" : ""}`}>
+                      className={`grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3 items-center px-5 py-3.5 hover:bg-cream-50 transition-colors ${book.isFeatured ? "bg-amber-50/60" : ""}`}>
                       {/* Title */}
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -470,6 +557,16 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                             ? "text-amber-500 hover:bg-amber-50"
                             : "text-gray-300 hover:text-amber-400 hover:bg-amber-50"}>
                           <FiStar className={book.isFeatured ? "fill-amber-400" : ""} />
+                        </IconBtn>
+                      </div>
+
+                      {/* Edit */}
+                      <div className="flex justify-center w-10">
+                        <IconBtn loading={false}
+                          title={locale === "zh" ? "编辑书籍" : "Edit book"}
+                          onClick={() => openEditBook(book)}
+                          className="text-gray-400 hover:text-forest-600 hover:bg-forest-50">
+                          <FiEdit2 />
                         </IconBtn>
                       </div>
 
@@ -674,6 +771,170 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
           )
         )}
 
+      {/* ── Edit Book Modal ── */}
+      <AnimatePresence>
+        {editingBook && editBook && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={e => { if (e.target === e.currentTarget) setEditingBook(null); }}>
+            <motion.div initial={{ scale: 0.96, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto">
+
+              {/* Header */}
+              <div className="sticky top-0 bg-white rounded-t-3xl border-b border-cream-100 px-6 py-4 flex items-center justify-between z-10">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-forest-50 rounded-xl flex items-center justify-center">
+                    <FiBook className="text-forest-600 text-sm" />
+                  </div>
+                  <h2 className="font-serif text-lg font-bold text-forest-900">
+                    {locale === "zh" ? "编辑书籍" : "Edit Book"}
+                  </h2>
+                </div>
+                <button onClick={() => setEditingBook(null)}
+                  className="p-2 hover:bg-gray-100 rounded-xl text-gray-400">
+                  <FiX />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* Title / Author grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <AdminInput label={locale === "zh" ? "英文书名 *" : "Title *"}
+                    value={editBook.title} onChange={v => setEditBook(b => b ? { ...b, title: v } : b)} required />
+                  <AdminInput label={locale === "zh" ? "中文书名" : "Chinese Title"}
+                    value={editBook.titleZh} onChange={v => setEditBook(b => b ? { ...b, titleZh: v } : b)} />
+                  <AdminInput label={locale === "zh" ? "作者 *" : "Author *"}
+                    value={editBook.author} onChange={v => setEditBook(b => b ? { ...b, author: v } : b)} required />
+                  <AdminInput label={locale === "zh" ? "作者（中文）" : "Author (ZH)"}
+                    value={editBook.authorZh} onChange={v => setEditBook(b => b ? { ...b, authorZh: v } : b)} />
+                </div>
+
+                {/* Cover URL */}
+                <AdminInput label={locale === "zh" ? "封面图片链接" : "Cover Image URL"}
+                  value={editBook.cover} onChange={v => setEditBook(b => b ? { ...b, cover: v } : b)}
+                  placeholder="https://..." />
+
+                {/* Genre + Year */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
+                      {locale === "zh" ? "分类" : "Genre"}
+                    </label>
+                    <select value={editBook.genre}
+                      onChange={e => setEditBook(b => b ? { ...b, genre: e.target.value } : b)}
+                      className="w-full px-3.5 py-2.5 border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 text-sm text-gray-700 bg-white appearance-none">
+                      <option value="">{locale === "zh" ? "无分类" : "No genre"}</option>
+                      {genres.map(g => (
+                        <option key={g.id} value={g.name}>
+                          {locale === "zh" ? (g.nameZh || g.name) : g.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <AdminInput label={locale === "zh" ? "出版年份" : "Publish Year"}
+                    value={editBook.publishYear} type="number"
+                    onChange={v => setEditBook(b => b ? { ...b, publishYear: v } : b)} placeholder="2024" />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
+                    {locale === "zh" ? "简介（英文）" : "Description"}
+                  </label>
+                  <textarea rows={2} value={editBook.description}
+                    onChange={e => setEditBook(b => b ? { ...b, description: e.target.value } : b)}
+                    className="w-full px-4 py-2.5 border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none text-sm text-gray-700" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
+                    {locale === "zh" ? "简介（中文）" : "Description (ZH)"}
+                  </label>
+                  <textarea rows={2} value={editBook.descriptionZh}
+                    onChange={e => setEditBook(b => b ? { ...b, descriptionZh: e.target.value } : b)}
+                    className="w-full px-4 py-2.5 border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none text-sm text-gray-700" />
+                </div>
+
+                {/* ── Reading source ── */}
+                <div className="border-t border-cream-100 pt-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                    {locale === "zh" ? "📖 阅读来源" : "📖 Reading Source"}
+                  </p>
+
+                  {/* Current file status */}
+                  {editBook.fileUrl ? (
+                    <div className="flex items-center gap-3 bg-forest-50 border border-forest-100 rounded-xl px-4 py-2.5 mb-3">
+                      <FiCheck className="text-forest-500 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-forest-800">
+                          {editBook.fileType?.toUpperCase() ?? "FILE"}
+                        </p>
+                        <p className="text-[10px] text-gray-400 truncate">{editBook.fileUrl}</p>
+                      </div>
+                      <button onClick={() => setEditBook(b => b ? { ...b, fileUrl: "", fileType: "" } : b)}
+                        className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0">
+                        <FiX size={14} />
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {/* Upload new file */}
+                  <label className={`flex flex-col items-center gap-2 px-4 py-4 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                    editUploadState === "uploading" ? "border-brand-300 bg-brand-50/30" :
+                    editUploadState === "done" ? "border-forest-400 bg-forest-50" :
+                    editUploadState === "error" ? "border-red-300 bg-red-50" :
+                    "border-cream-200 bg-gray-50 hover:border-brand-300"}`}>
+                    {editUploadState === "uploading" ? (
+                      <><div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs text-gray-500">{locale === "zh" ? "上传中…" : "Uploading…"}</span></>
+                    ) : editUploadState === "done" ? (
+                      <><FiCheck className="text-forest-500 text-lg" />
+                      <span className="text-xs text-forest-700 font-medium">{editUploadName}</span>
+                      <span className="text-[11px] text-gray-400">{locale === "zh" ? "已更换" : "Replaced"}</span></>
+                    ) : (
+                      <><FiUploadCloud className="text-xl text-gray-400" />
+                      <span className="text-xs text-gray-600 font-medium">
+                        {locale === "zh" ? "上传新文件（PDF / EPUB / TXT）" : "Upload new file (PDF / EPUB / TXT)"}
+                      </span></>
+                    )}
+                    <input type="file" className="hidden"
+                      accept=".pdf,.epub,.txt,application/pdf,application/epub+zip,text/plain"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleEditFileUpload(f); }} />
+                  </label>
+
+                  {/* External link */}
+                  <div className="mt-3">
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide flex items-center gap-1">
+                      <FiLink className="text-[11px]" />
+                      {locale === "zh" ? "外部链接 / Kindle" : "External Link / Kindle"}
+                    </label>
+                    <input type="url" value={editBook.readLink}
+                      onChange={e => setEditBook(b => b ? { ...b, readLink: e.target.value } : b)}
+                      placeholder="https://www.amazon.co.uk/dp/..."
+                      className="w-full px-3.5 py-2.5 border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 text-sm text-gray-700 placeholder-gray-300" />
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-2 sticky bottom-0 bg-white pb-1">
+                  <button onClick={() => setEditingBook(null)}
+                    className="flex-1 py-3 border border-cream-200 rounded-xl text-gray-600 font-medium hover:bg-gray-50 text-sm">
+                    {locale === "zh" ? "取消" : "Cancel"}
+                  </button>
+                  <button onClick={handleSaveBookEdit} disabled={bookSaving || !editBook.title || !editBook.author}
+                    className="flex-1 py-3 bg-forest-600 hover:bg-forest-700 text-white rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                    {bookSaving
+                      ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      : <FiCheck />}
+                    {locale === "zh" ? "保存更改" : "Save Changes"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Delete Confirm Modal ── */}
       <AnimatePresence>
         {deleteTarget && (
@@ -772,6 +1033,27 @@ function Badge({ children, color }: { children: React.ReactNode; color: "brand" 
     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
       color === "brand" ? "bg-brand-100 text-brand-700" : "bg-forest-100 text-forest-700"
     }`}>{children}</span>
+  );
+}
+
+function AdminInput({ label, value, onChange, required, placeholder, type = "text" }: {
+  label: string; value: string; onChange: (v: string) => void;
+  required?: boolean; placeholder?: string; type?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        required={required}
+        placeholder={placeholder}
+        className="w-full px-3.5 py-2.5 border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 text-sm text-gray-700 placeholder-gray-300 transition-shadow"
+      />
+    </div>
   );
 }
 

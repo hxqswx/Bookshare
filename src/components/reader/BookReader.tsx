@@ -172,6 +172,52 @@ function PdfReader({
   );
 }
 
+// ─── TXT Reader ───────────────────────────────────────────────────────────────
+
+function TxtReader({
+  url, theme, fontSize, locale, onTextExtracted,
+}: {
+  url: string; theme: Theme; fontSize: number; locale: string;
+  onTextExtracted: (text: string) => void;
+}) {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const tc = THEMES[theme];
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(url)
+      .then(r => r.text())
+      .then(t => { setText(t); onTextExtracted(t.slice(0, 8000)); })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [url, onTextExtracted]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64 gap-3">
+      <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      <span className={`text-sm ${tc.text}`}>{locale === "zh" ? "正在加载…" : "Loading…"}</span>
+    </div>
+  );
+
+  if (error) return (
+    <div className={`text-center py-16 ${tc.text}`}>
+      <div className="text-4xl mb-3">😞</div>
+      <p>{locale === "zh" ? "文件加载失败" : "Failed to load file"}</p>
+    </div>
+  );
+
+  return (
+    <div
+      className={`max-w-2xl mx-auto leading-relaxed whitespace-pre-wrap font-sans ${tc.text}`}
+      style={{ fontSize }}
+    >
+      {text}
+    </div>
+  );
+}
+
 // ─── EPUB Reader ──────────────────────────────────────────────────────────────
 
 function EpubReader({
@@ -408,6 +454,14 @@ export function BookReader({ book, locale, initialPage }: {
             locale={locale}
             onPageChange={handlePageChange}
             onTotalPages={setTotalPages}
+            onTextExtracted={handleTextExtracted}
+          />
+        ) : book.fileUrl && book.fileType === "txt" ? (
+          <TxtReader
+            url={book.fileUrl}
+            theme={theme}
+            fontSize={fontSize}
+            locale={locale}
             onTextExtracted={handleTextExtracted}
           />
         ) : book.fileUrl && book.fileType === "epub" ? (

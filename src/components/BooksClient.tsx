@@ -94,17 +94,19 @@ export function BooksClient({
   const handleFileUpload = async (file: File) => {
     setUploadState("uploading");
     setUploadFileName(file.name);
-    const form = new FormData();
-    form.append("file", file);
     try {
-      const res = await fetch("/api/upload", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      setNewBook(b => ({ ...b, fileUrl: data.url, fileType: data.type }));
+      const { upload } = await import("@vercel/blob/client");
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+      });
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const typeMap: Record<string, string> = { pdf: "pdf", epub: "epub", txt: "txt" };
+      setNewBook(b => ({ ...b, fileUrl: blob.url, fileType: typeMap[ext] ?? "pdf" }));
       setUploadState("done");
     } catch (err) {
       setUploadState("error");
-      toast.error(err instanceof Error ? err.message : (locale === "zh" ? "上传失败" : "Upload failed"));
+      toast.error(err instanceof Error ? err.message : (locale === "zh" ? "上传失败，请检查文件格式" : "Upload failed"));
     }
   };
 
@@ -580,15 +582,15 @@ export function BooksClient({
                         {uploadState === "idle" && (
                           <>
                             <FiUploadCloud className="text-2xl text-gray-400" />
-                            <span className="text-xs font-medium text-gray-600">{locale === "zh" ? "点击上传 PDF / EPUB" : "Click to upload PDF / EPUB"}</span>
-                            <span className="text-[11px] text-gray-400">{locale === "zh" ? "最大 50 MB" : "Max 50 MB"}</span>
+                            <span className="text-xs font-medium text-gray-600">{locale === "zh" ? "点击上传 PDF / EPUB / TXT" : "Click to upload PDF / EPUB / TXT"}</span>
+                            <span className="text-[11px] text-gray-400">{locale === "zh" ? "最大 100 MB" : "Max 100 MB"}</span>
                           </>
                         )}
                       </label>
                       <input
                         id="book-file-upload"
                         type="file"
-                        accept=".pdf,.epub,application/pdf,application/epub+zip"
+                        accept=".pdf,.epub,.txt,application/pdf,application/epub+zip,text/plain"
                         className="hidden"
                         onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
                       />
