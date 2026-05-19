@@ -5,9 +5,8 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
-import { motion } from "framer-motion";
-import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight } from "react-icons/fi";
-import toast from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
+import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight, FiAlertCircle, FiX } from "react-icons/fi";
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
@@ -26,39 +25,35 @@ function LoginPageContent() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Show error from NextAuth ?error= param
+  // Map NextAuth ?error= param to human-readable message
   useEffect(() => {
     const error = searchParams.get("error");
     if (!error) return;
     const messages: Record<string, [string, string]> = {
       OAuthAccountNotLinked: [
-        "该邮箱已用其他方式注册，请使用邮箱+密码登录",
-        "This email was registered differently. Please use email & password.",
+        "该邮箱已用其他方式注册，请使用邮箱 + 密码登录",
+        "This email was registered differently — please use email & password.",
       ],
       OAuthCreateAccount: [
-        "创建账户失败，请检查数据库配置",
-        "Failed to create account — database may need migration.",
+        "创建账户失败，请稍后再试",
+        "Failed to create account, please try again later.",
       ],
-      Callback: [
-        "登录回调出错，请重试",
-        "Sign-in callback error, please try again",
-      ],
-      OAuthSignin: ["Google 登录出错，请重试", "Google sign-in error, please try again"],
-      OAuthCallback: ["Google 授权失败，请重试", "Google authorization failed, please try again"],
-      Configuration: [
-        "服务器配置错误，请联系管理员",
-        "Server configuration error — contact the admin.",
-      ],
-      AccessDenied: ["访问被拒绝", "Access denied"],
+      Callback: ["登录回调出错，请重试", "Sign-in callback error, please try again."],
+      OAuthSignin: ["Google 登录出错，请重试", "Google sign-in error, please try again."],
+      OAuthCallback: ["Google 授权失败，请重试", "Google authorization failed, please try again."],
+      Configuration: ["服务器配置错误，请联系管理员", "Server configuration error — contact the admin."],
+      AccessDenied: ["访问被拒绝", "Access denied."],
     };
     const [zh, en] = messages[error] ?? [`登录出错 (${error})`, `Sign-in error (${error})`];
-    toast.error(locale === "zh" ? zh : en, { duration: 8000 });
+    setErrorMsg(locale === "zh" ? zh : en);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
     setLoading(true);
     const result = await signIn("credentials", {
       email: form.email.toLowerCase(),
@@ -66,11 +61,10 @@ function LoginPageContent() {
       redirect: false,
     });
     if (result?.ok) {
-      toast.success(locale === "zh" ? "登录成功！" : "Signed in!");
       router.push("/");
       router.refresh();
     } else {
-      toast.error(locale === "zh" ? "邮箱或密码错误" : "Invalid email or password");
+      setErrorMsg(locale === "zh" ? "邮箱或密码错误，请重试" : "Incorrect email or password, please try again.");
       setLoading(false);
     }
   };
@@ -132,7 +126,26 @@ function LoginPageContent() {
 
           <div className="bg-white rounded-3xl border border-cream-200 shadow-card p-8">
             <h1 className="font-serif text-2xl font-bold text-forest-900 mb-1">{t.auth.login_title}</h1>
-            <p className="text-sm text-gray-400 mb-8">{t.auth.login_subtitle}</p>
+            <p className="text-sm text-gray-400 mb-6">{t.auth.login_subtitle}</p>
+
+            {/* ── Error banner ── */}
+            <AnimatePresence>
+              {errorMsg && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3.5 mb-6"
+                >
+                  <FiAlertCircle className="flex-shrink-0 mt-0.5 text-red-500 text-lg" />
+                  <p className="text-sm font-medium leading-snug flex-1">{errorMsg}</p>
+                  <button onClick={() => setErrorMsg(null)} className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors mt-0.5">
+                    <FiX size={15} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Google SSO */}
             <button

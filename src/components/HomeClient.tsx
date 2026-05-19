@@ -12,6 +12,7 @@ import {
 } from "react-icons/fi";
 import { SiX, SiFacebook, SiWhatsapp, SiWechat, SiTiktok } from "react-icons/si";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 
 type FeaturedBook = {
   id: string; title: string; titleZh: string | null;
@@ -59,6 +60,7 @@ const TYPE_BADGE: Record<string, { label: string; labelEn: string; color: string
 
 export function HomeClient({ data }: { data: HomeData }) {
   const { locale, t } = useLanguage();
+  const { data: session } = useSession();
 
   return (
     <div className="overflow-hidden">
@@ -97,10 +99,17 @@ export function HomeClient({ data }: { data: HomeData }) {
             </motion.p>
 
             <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 mb-14">
-              <Link href="/register" className="btn-brand text-base px-8 py-4 rounded-2xl shadow-brand">
-                {locale === "zh" ? "免费加入" : "Join Free"}
-                <FiArrowRight className="ml-1" />
-              </Link>
+              {session ? (
+                <Link href="/share" className="btn-brand text-base px-8 py-4 rounded-2xl shadow-brand">
+                  ✍️ {locale === "zh" ? "去分享" : "Share Now"}
+                  <FiArrowRight className="ml-1" />
+                </Link>
+              ) : (
+                <Link href="/register" className="btn-brand text-base px-8 py-4 rounded-2xl shadow-brand">
+                  {locale === "zh" ? "免费加入" : "Join Free"}
+                  <FiArrowRight className="ml-1" />
+                </Link>
+              )}
               <Link href="/books" className="btn-outline text-base px-8 py-4 rounded-2xl">
                 {t.home.hero_cta}
               </Link>
@@ -539,13 +548,19 @@ export function HomeClient({ data }: { data: HomeData }) {
             </h2>
             <p className="text-gray-500 text-xl mb-10">
               {locale === "zh"
-                ? "加入数千位书友，用阅读改变自己"
-                : "Join thousands of readers and change yourself through reading"}
+                ? (session ? "继续你的阅读之旅，和书友们分享吧" : "加入数千位书友，用阅读改变自己")
+                : (session ? "Continue your journey — share what you're reading" : "Join thousands of readers and change yourself through reading")}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/register" className="btn-brand text-lg px-10 py-4 rounded-2xl shadow-brand">
-                {locale === "zh" ? "立即免费注册" : "Sign Up Free"}
-              </Link>
+              {session ? (
+                <Link href="/share" className="btn-brand text-lg px-10 py-4 rounded-2xl shadow-brand">
+                  ✍️ {locale === "zh" ? "去分享" : "Share a Book"}
+                </Link>
+              ) : (
+                <Link href="/register" className="btn-brand text-lg px-10 py-4 rounded-2xl shadow-brand">
+                  {locale === "zh" ? "立即免费注册" : "Sign Up Free"}
+                </Link>
+              )}
               <Link href="/books" className="btn-outline text-lg px-10 py-4 rounded-2xl">
                 {locale === "zh" ? "先逛逛书库" : "Browse Books First"}
               </Link>
@@ -574,7 +589,7 @@ export function HomeClient({ data }: { data: HomeData }) {
                 {[
                   ["/books", locale === "zh" ? "书库" : "Books"],
                   ["/share", locale === "zh" ? "分享" : "Share"],
-                  ["/register", locale === "zh" ? "加入" : "Join"],
+                  ...(!session ? [["/register", locale === "zh" ? "加入" : "Join"]] as [string, string][] : []),
                 ].map(([href, label]) => (
                   <div key={href}>
                     <Link href={href} className="hover:text-brand-400 transition-colors">{label}</Link>
