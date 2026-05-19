@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useLanguage } from "@/context/LanguageContext";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FiArrowLeft, FiUsers, FiStar, FiHeart,
-  FiMessageSquare, FiShare2, FiCheck, FiX,
+  FiMessageSquare, FiShare2, FiCheck, FiX, FiCopy, FiTwitter,
 } from "react-icons/fi";
+import { SiWhatsapp, SiX, SiFacebook, SiWechat } from "react-icons/si";
 import { formatDistanceToNow } from "@/lib/utils";
 import { BookCover } from "@/components/BookCover";
 import toast from "react-hot-toast";
@@ -58,10 +59,130 @@ const TYPE_CONFIG: Record<string, { labelZh: string; labelEn: string; pill: stri
   share:    { labelZh: "分享", labelEn: "Share",    pill: "bg-sky-50 text-sky-700 border-sky-100", emoji: "💬" },
 };
 
+const SITE_URL =
+  typeof window !== "undefined"
+    ? window.location.origin
+    : process.env.NEXT_PUBLIC_SITE_URL || "";
+
+/* ── Social Share Tray ── */
+function SocialShareTray({
+  bookId, title, author, locale, onClose,
+}: {
+  bookId: string; title: string; author: string; locale: string; onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const pageUrl = `${SITE_URL}/books/${bookId}`;
+  const shareText =
+    locale === "zh"
+      ? `我在 BookShare 发现了《${title}》by ${author}，快来看看！`
+      : `Check out "${title}" by ${author} on BookShare!`;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(pageUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
+  const PLATFORMS = [
+    {
+      key: "x",
+      label: "X / Twitter",
+      icon: <SiX />,
+      color: "hover:bg-black hover:text-white hover:border-black",
+      href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(pageUrl)}`,
+    },
+    {
+      key: "facebook",
+      label: "Facebook",
+      icon: <SiFacebook />,
+      color: "hover:bg-[#1877F2] hover:text-white hover:border-[#1877F2]",
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`,
+    },
+    {
+      key: "whatsapp",
+      label: "WhatsApp",
+      icon: <SiWhatsapp />,
+      color: "hover:bg-[#25D366] hover:text-white hover:border-[#25D366]",
+      href: `https://wa.me/?text=${encodeURIComponent(shareText + " " + pageUrl)}`,
+    },
+    {
+      key: "wechat",
+      label: locale === "zh" ? "微信扫一扫" : "WeChat",
+      icon: <SiWechat />,
+      color: "hover:bg-[#07C160] hover:text-white hover:border-[#07C160]",
+      href: `https://qr.alipay.com/ts?charset=utf-8&url=${encodeURIComponent(pageUrl)}`,
+      isQr: true,
+    },
+    {
+      key: "weibo",
+      label: locale === "zh" ? "微博" : "Weibo",
+      icon: <span className="text-xs font-bold">微博</span>,
+      color: "hover:bg-[#E6162D] hover:text-white hover:border-[#E6162D]",
+      href: `https://service.weibo.com/share/share.php?url=${encodeURIComponent(pageUrl)}&title=${encodeURIComponent(shareText)}`,
+    },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+      transition={{ duration: 0.18 }}
+      className="bg-white border border-cream-200 rounded-2xl p-4 shadow-card"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          {locale === "zh" ? "分享到" : "Share to"}
+        </p>
+        <button onClick={onClose} className="text-gray-300 hover:text-gray-500 transition-colors text-sm">
+          <FiX />
+        </button>
+      </div>
+
+      {/* Platform buttons */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {PLATFORMS.map(({ key, label, icon, color, href }) => (
+          <a
+            key={key}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-flex items-center gap-1.5 px-3 py-2 border border-cream-200 rounded-xl text-sm text-gray-600 transition-all ${color}`}
+          >
+            <span className="text-base leading-none">{icon}</span>
+            <span className="text-xs font-medium">{label}</span>
+          </a>
+        ))}
+      </div>
+
+      {/* Copy link */}
+      <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 border border-cream-100">
+        <span className="text-xs text-gray-400 truncate flex-1">{pageUrl}</span>
+        <button
+          onClick={copy}
+          className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all flex-shrink-0 ${
+            copied
+              ? "bg-forest-100 text-forest-700"
+              : "bg-white border border-cream-200 text-gray-600 hover:border-brand-200 hover:text-brand-600"
+          }`}
+        >
+          {copied ? <FiCheck className="text-xs" /> : <FiCopy className="text-xs" />}
+          {copied
+            ? (locale === "zh" ? "已复制" : "Copied!")
+            : (locale === "zh" ? "复制链接" : "Copy")}
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 export function BookDetailClient({ book }: { book: Book }) {
   const { locale, t } = useLanguage();
   const { data: session } = useSession();
   const router = useRouter();
+  const [showShareTray, setShowShareTray] = useState(false);
 
   const [myStatus, setMyStatus]     = useState<ReadStatus>(null);
   // Track exactly which status is being sent (null = no request in flight)
@@ -281,13 +402,35 @@ export function BookDetailClient({ book }: { book: Book }) {
               </div>
             </div>
 
-            {/* Share button */}
-            <div className="mt-5">
-              <Link href={`/share?book=${book.id}`}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-brand">
-                <FiShare2 />
-                {t.books.share_book}
-              </Link>
+            {/* Share section */}
+            <div className="mt-5 space-y-3">
+              {/* Write a post button */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <Link href={`/share?book=${book.id}`}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-brand">
+                  <FiShare2 />
+                  {t.books.share_book}
+                </Link>
+                <button
+                  onClick={() => setShowShareTray(v => !v)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-cream-200 hover:border-brand-200 hover:bg-brand-50/40 text-gray-600 hover:text-brand-600 rounded-xl text-sm font-medium transition-all">
+                  <FiShare2 className="text-xs" />
+                  {locale === "zh" ? "分享到社交媒体" : "Share on Social"}
+                </button>
+              </div>
+
+              {/* Social share tray */}
+              <AnimatePresence>
+                {showShareTray && (
+                  <SocialShareTray
+                    bookId={book.id}
+                    title={displayTitle}
+                    author={displayAuthor}
+                    locale={locale}
+                    onClose={() => setShowShareTray(false)}
+                  />
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </motion.div>

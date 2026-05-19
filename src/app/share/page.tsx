@@ -13,6 +13,7 @@ import {
   FiSend,
   FiLock,
   FiEdit3,
+  FiFilter,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 import { formatDistanceToNow } from "@/lib/utils";
@@ -32,6 +33,13 @@ interface Book {
   title: string;
   titleZh: string | null;
   author: string;
+  genre: string | null;
+}
+
+interface GenreItem {
+  id: string;
+  name: string;
+  nameZh: string | null;
 }
 
 /* Deterministic image colour from name */
@@ -66,6 +74,8 @@ function SharePageContent() {
   const [type, setType] = useState("share");
   const [bookId, setBookId] = useState(preselectedBook || "");
   const [books, setBooks] = useState<Book[]>([]);
+  const [genreFilter, setGenreFilter] = useState("");
+  const [genres, setGenres] = useState<GenreItem[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
@@ -75,9 +85,14 @@ function SharePageContent() {
 
   const fetchBooks = async () => {
     try {
-      const res = await fetch("/api/books?page=1&limit=100");
-      const data = await res.json();
-      setBooks(data.books || []);
+      const [booksRes, genresRes] = await Promise.all([
+        fetch("/api/books?page=1&limit=100"),
+        fetch("/api/genres"),
+      ]);
+      const booksData = await booksRes.json();
+      const genresData = await genresRes.json();
+      setBooks(booksData.books || []);
+      setGenres(Array.isArray(genresData) ? genresData : []);
     } catch {}
   };
 
@@ -259,21 +274,61 @@ function SharePageContent() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-3">
-                {/* Book selector */}
-                <div className="relative">
-                  <FiBook className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm" />
-                  <select
-                    value={bookId}
-                    onChange={(e) => setBookId(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-cream-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white appearance-none cursor-pointer"
-                  >
-                    <option value="">📚 {t.share.select_book}</option>
-                    {books.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {locale === "zh" ? (b.titleZh || b.title) : b.title} — {b.author}
-                      </option>
-                    ))}
-                  </select>
+                {/* Genre filter + Book selector */}
+                <div className="space-y-2">
+                  {/* Genre filter chips */}
+                  {genres.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1">
+                        <FiFilter className="text-[9px]" />
+                        {locale === "zh" ? "分类" : "Genre"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setGenreFilter(""); setBookId(""); }}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all ${
+                          genreFilter === ""
+                            ? "bg-brand-500 text-white border-brand-500"
+                            : "bg-white text-gray-500 border-cream-200 hover:border-brand-200 hover:text-brand-600"
+                        }`}
+                      >
+                        {locale === "zh" ? "全部" : "All"}
+                      </button>
+                      {genres.map((g) => (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => { setGenreFilter(g.name); setBookId(""); }}
+                          className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all ${
+                            genreFilter === g.name
+                              ? "bg-brand-500 text-white border-brand-500"
+                              : "bg-white text-gray-500 border-cream-200 hover:border-brand-200 hover:text-brand-600"
+                          }`}
+                        >
+                          {locale === "zh" ? (g.nameZh || g.name) : g.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Book selector */}
+                  <div className="relative">
+                    <FiBook className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm" />
+                    <select
+                      value={bookId}
+                      onChange={(e) => setBookId(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 border border-cream-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white appearance-none cursor-pointer"
+                    >
+                      <option value="">📚 {t.share.select_book}</option>
+                      {books
+                        .filter((b) => !genreFilter || b.genre === genreFilter)
+                        .map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {locale === "zh" ? (b.titleZh || b.title) : b.title} — {b.author}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Textarea */}

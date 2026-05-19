@@ -4,22 +4,22 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 const GENRES = [
-  { name: "Literary Fiction",  nameZh: "文学小说",  order: 1  },
-  { name: "Classic Fiction",   nameZh: "经典名著",  order: 2  },
-  { name: "Science Fiction",   nameZh: "科幻",      order: 3  },
-  { name: "Historical Fiction",nameZh: "历史小说",  order: 4  },
-  { name: "Fantasy",           nameZh: "奇幻",      order: 5  },
-  { name: "Dystopian Fiction", nameZh: "反乌托邦",  order: 6  },
-  { name: "Fiction",           nameZh: "小说",      order: 7  },
-  { name: "Mystery",           nameZh: "推理悬疑",  order: 8  },
-  { name: "History",           nameZh: "历史",      order: 9  },
-  { name: "Popular Science",   nameZh: "科普",      order: 10 },
-  { name: "Psychology",        nameZh: "心理学",    order: 11 },
-  { name: "Self-Help",         nameZh: "自我提升",  order: 12 },
-  { name: "Business",          nameZh: "商业",      order: 13 },
-  { name: "Finance",           nameZh: "财经",      order: 14 },
-  { name: "Memoir",            nameZh: "回忆录",    order: 15 },
-  { name: "Philosophy",        nameZh: "哲学",      order: 16 },
+  { name: "Literary Fiction", nameZh: "文学小说", order: 1 },
+  { name: "Classic Fiction", nameZh: "经典名著", order: 2 },
+  { name: "Science Fiction", nameZh: "科幻", order: 3 },
+  { name: "Historical Fiction", nameZh: "历史小说", order: 4 },
+  { name: "Fantasy", nameZh: "奇幻", order: 5 },
+  { name: "Dystopian Fiction", nameZh: "反乌托邦", order: 6 },
+  { name: "Fiction", nameZh: "小说", order: 7 },
+  { name: "Mystery", nameZh: "推理悬疑", order: 8 },
+  { name: "History", nameZh: "历史", order: 9 },
+  { name: "Popular Science", nameZh: "科普", order: 10 },
+  { name: "Psychology", nameZh: "心理学", order: 11 },
+  { name: "Self-Help", nameZh: "自我提升", order: 12 },
+  { name: "Business", nameZh: "商业", order: 13 },
+  { name: "Finance", nameZh: "财经", order: 14 },
+  { name: "Memoir", nameZh: "回忆录", order: 15 },
+  { name: "Philosophy", nameZh: "哲学", order: 16 },
 ];
 
 async function main() {
@@ -147,14 +147,14 @@ async function main() {
 
     prisma.book.upsert({
       where: { id: "book8" },
-      update: {},
+      update: { cover: "/covers/weicheng.jpg" },
       create: {
         id: "book8",
         title: "Fortress Besieged",
         titleZh: "围城",
         author: "Qian Zhongshu",
         authorZh: "钱锺书",
-        cover: "https://covers.openlibrary.org/b/isbn/9787020024759-L.jpg",
+        cover: "/covers/weicheng.jpg",
         description:
           "A witty satirical novel about love and academia in 1930s China — marriage is the besieged city everyone wants to enter and escape.",
         descriptionZh:
@@ -166,14 +166,14 @@ async function main() {
 
     prisma.book.upsert({
       where: { id: "book9" },
-      update: {},
+      update: { cover: "/covers/bailuyuan.jpg" },
       create: {
         id: "book9",
         title: "White Deer Plain",
         titleZh: "白鹿原",
         author: "Chen Zhongshi",
         authorZh: "陈忠实",
-        cover: "https://covers.openlibrary.org/b/isbn/9787020043095-L.jpg",
+        cover: "/covers/bailuyuan.jpg",
         description:
           "A Mao Dun Literature Prize epic depicting fifty years of feudal clan rivalry on the Guanzhong Plain.",
         descriptionZh:
@@ -447,27 +447,6 @@ async function main() {
         publishYear: 2018,
       },
     }),
-
-    // ── Featured / Editor's Pick ─────────────────────────────────────────
-    prisma.book.upsert({
-      where: { id: "book21" },
-      update: { isFeatured: true },   // ensure it stays featured on re-seed
-      create: {
-        id: "book21",
-        title: "What Every Chinese Founder Should Know About The UK Business System",
-        titleZh: "每位中国创始人都应了解的英国商业体系",
-        author: "Various Contributors",
-        authorZh: "多位作者",
-        cover: null,
-        description:
-          "A practical guide for Chinese entrepreneurs navigating the UK business system — from company formation and banking to legal compliance, tax, and fundraising. Covers the key differences between UK and Chinese corporate culture that every founder needs to understand before launching or expanding in Britain.",
-        descriptionZh:
-          "专为中国创业者撰写的英国商业实战指南。涵盖公司注册、银行开户、法律合规、税务、融资等核心议题，深入剖析中英两国商业文化差异，帮助创始人避开常见陷阱、快速融入英国商业生态。",
-        genre: "Business",
-        publishYear: 2024,
-        isFeatured: true,
-      },
-    }),
   ]);
 
   console.log("✅ 20 books seeded successfully!");
@@ -557,16 +536,16 @@ async function main() {
   await prisma.userBook.createMany({
     skipDuplicates: true,
     data: [
-      { userId: alice.id, bookId: "book1",  status: "finished",     progress: 100, rating: 5 },
-      { userId: alice.id, bookId: "book4",  status: "reading",      progress: 60 },
-      { userId: alice.id, bookId: "book5",  status: "want_to_read", progress: 0 },
-      { userId: alice.id, bookId: "book6",  status: "want_to_read", progress: 0 },
-      { userId: alice.id, bookId: "book15", status: "finished",     progress: 100, rating: 5 },
-      { userId: bob.id,   bookId: "book3",  status: "finished",     progress: 100, rating: 5 },
-      { userId: bob.id,   bookId: "book2",  status: "reading",      progress: 45 },
-      { userId: bob.id,   bookId: "book1",  status: "finished",     progress: 100, rating: 5 },
-      { userId: bob.id,   bookId: "book14", status: "finished",     progress: 100, rating: 5 },
-      { userId: bob.id,   bookId: "book13", status: "want_to_read", progress: 0 },
+      { userId: alice.id, bookId: "book1", status: "finished", progress: 100, rating: 5 },
+      { userId: alice.id, bookId: "book4", status: "reading", progress: 60 },
+      { userId: alice.id, bookId: "book5", status: "want_to_read", progress: 0 },
+      { userId: alice.id, bookId: "book6", status: "want_to_read", progress: 0 },
+      { userId: alice.id, bookId: "book15", status: "finished", progress: 100, rating: 5 },
+      { userId: bob.id, bookId: "book3", status: "finished", progress: 100, rating: 5 },
+      { userId: bob.id, bookId: "book2", status: "reading", progress: 45 },
+      { userId: bob.id, bookId: "book1", status: "finished", progress: 100, rating: 5 },
+      { userId: bob.id, bookId: "book14", status: "finished", progress: 100, rating: 5 },
+      { userId: bob.id, bookId: "book13", status: "want_to_read", progress: 0 },
     ],
   });
 
