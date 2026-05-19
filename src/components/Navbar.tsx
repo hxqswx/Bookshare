@@ -57,9 +57,6 @@ export function Navbar() {
 
           {session ? (
             <div className="flex items-center gap-2">
-              <Link href="/share" className="btn-brand text-sm py-2 px-4">
-                ✍️ {t.nav.share}
-              </Link>
               {/* Avatar dropdown */}
               <div className="relative group">
                 <button className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl hover:bg-cream-100 transition-colors">

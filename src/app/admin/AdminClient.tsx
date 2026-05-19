@@ -311,8 +311,12 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
       setEditUploadState("done");
     } catch (err) {
       setEditUploadState("error");
-      const msg = err instanceof Error ? err.message : "";
-      toast.error(msg || (locale === "zh" ? "上传失败，请重试" : "Upload failed, please retry"));
+      const raw = err instanceof Error ? err.message : String(err);
+      const isCors = raw.toLowerCase().includes("cors") || raw.toLowerCase().includes("failed to fetch") || raw.toLowerCase().includes("network");
+      const msg = isCors
+        ? (locale === "zh" ? "存储服务未正确配置，请联系管理员" : "Storage not configured — contact admin")
+        : (raw || (locale === "zh" ? "上传失败，请重试" : "Upload failed, please retry"));
+      toast.error(msg);
     } finally {
       clearTimeout(timer);
     }
