@@ -102,8 +102,8 @@ function EditProfileModal({
     if (!file) return;
 
     // Basic client-side validation
-    if (file.size > 2 * 1024 * 1024) {
-      setError(locale === "zh" ? "图片不能超过 2MB" : "Image must be under 2 MB");
+    if (file.size > 10 * 1024 * 1024) {
+      setError(locale === "zh" ? "图片不能超过 10MB" : "Image must be under 10 MB");
       return;
     }
     const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
@@ -115,15 +115,16 @@ function EditProfileModal({
     setError("");
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload/avatar", { method: "POST", body: fd });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error ?? "Upload failed");
-      }
-      const { url } = await res.json() as { url: string };
-      setImage(url);
+      // Direct client-side upload to Vercel Blob — bypasses serverless body limit
+      const { upload } = await import("@vercel/blob/client");
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const filename = `avatar-${Date.now()}.${ext}`;
+      const blob = await upload(filename, file, {
+        access: "private",
+        handleUploadUrl: "/api/upload/direct",
+        clientPayload: JSON.stringify({ type: "avatar" }),
+      });
+      setImage(blob.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : (locale === "zh" ? "上传失败" : "Upload failed"));
     } finally {

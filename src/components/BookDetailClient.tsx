@@ -251,7 +251,7 @@ function SocialShareTray({
   );
 }
 
-/* ── Read Button (login-gated) ── */
+/* ── Read Button (login-gated, prominent) ── */
 function ReadButton({
   book, session, locale, router,
 }: {
@@ -262,9 +262,13 @@ function ReadButton({
 }) {
   const label = locale === "zh"
     ? (book.fileUrl ? "开始阅读" : book.readLink?.includes("amazon") ? "Kindle 阅读" : "在线阅读")
-    : (book.fileUrl ? "Read Now" : book.readLink?.includes("amazon") ? "Read on Kindle" : "Read Online");
+    : (book.fileUrl ? "Start Reading" : book.readLink?.includes("amazon") ? "Read on Kindle" : "Read Online");
 
-  const btnClass = "inline-flex items-center gap-2 px-6 py-3 bg-forest-600 hover:bg-forest-700 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-lg";
+  const btnClass =
+    "w-full flex items-center justify-center gap-2.5 px-6 py-4 " +
+    "bg-gradient-to-r from-forest-700 to-forest-500 hover:from-forest-800 hover:to-forest-600 " +
+    "text-white rounded-2xl text-base font-bold tracking-wide " +
+    "shadow-lg hover:shadow-xl transition-all duration-200 active:scale-[0.98]";
 
   if (!session) {
     return (
@@ -275,7 +279,7 @@ function ReadButton({
         }}
         className={btnClass}
       >
-        <FiBookOpen />
+        <FiBookOpen className="text-lg flex-shrink-0" />
         {label}
       </button>
     );
@@ -284,7 +288,7 @@ function ReadButton({
   if (book.fileUrl) {
     return (
       <Link href={`/books/${book.id}/read`} className={btnClass}>
-        <FiBookOpen />
+        <FiBookOpen className="text-lg flex-shrink-0" />
         {label}
       </Link>
     );
@@ -297,7 +301,7 @@ function ReadButton({
       rel="noopener noreferrer"
       className={btnClass}
     >
-      <FiBookOpen />
+      <FiBookOpen className="text-lg flex-shrink-0" />
       {label}
     </a>
   );
@@ -476,71 +480,79 @@ export function BookDetailClient({ book }: { book: Book }) {
               </p>
             )}
 
-            {/* ── Reading Status Section ── */}
-            <div className="mt-6">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                {locale === "zh" ? "阅读状态" : "Reading Status"}
-              </p>
+            {/* ── Actions ── */}
+            <div className="mt-6 space-y-4">
 
-              {/* Interactive status buttons */}
-              <div className="flex gap-2 flex-wrap mb-4">
-                {STATUS_BTNS.map(({ key, emoji, labelZh, labelEn, active, idle }) => {
-                  const isActive   = myStatus === key;
-                  const isThisLoading = pendingStatus === key ||
-                    (pendingStatus === "remove" && isActive);
-                  const isAnyLoading  = pendingStatus !== null;
-                  return (
-                    <button key={key}
-                      onClick={() => handleStatus(key)}
-                      disabled={isAnyLoading || !statusFetched}
-                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-200 disabled:cursor-not-allowed ${isActive ? active : idle} ${isAnyLoading && !isThisLoading ? "opacity-50" : ""}`}>
-                      {isThisLoading
-                        ? <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        : <span>{emoji}</span>}
-                      {locale === "zh" ? labelZh : labelEn}
-                      {isActive && !isThisLoading && (
-                        <FiCheck className="text-xs" />
-                      )}
-                    </button>
-                  );
-                })}
+              {/* 1. Read button — most prominent, full-width */}
+              {(book.fileUrl || book.readLink) && (
+                <ReadButton book={book} session={session} locale={locale} router={router} />
+              )}
+
+              {/* 2. Reading status — segmented control */}
+              <div>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  {locale === "zh" ? "阅读状态" : "Reading Status"}
+                </p>
+                <div className="flex rounded-2xl border border-cream-200 overflow-hidden bg-gray-50">
+                  {STATUS_BTNS.map(({ key, emoji, labelZh, labelEn }, idx) => {
+                    const isActive = myStatus === key;
+                    const isThisLoading = pendingStatus === key ||
+                      (pendingStatus === "remove" && isActive);
+                    const isAnyLoading = pendingStatus !== null;
+
+                    const activeColors = [
+                      "bg-sky-500 text-white",
+                      "bg-brand-500 text-white",
+                      "bg-forest-600 text-white",
+                    ];
+
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => handleStatus(isActive ? null : key)}
+                        disabled={isAnyLoading || !statusFetched}
+                        className={[
+                          "flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-semibold transition-all duration-200",
+                          "disabled:cursor-not-allowed",
+                          idx > 0 ? "border-l border-cream-200" : "",
+                          isActive
+                            ? activeColors[idx]
+                            : "text-gray-500 hover:bg-white hover:text-gray-800",
+                          isAnyLoading && !isThisLoading ? "opacity-40" : "",
+                        ].join(" ")}
+                      >
+                        {isThisLoading
+                          ? <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          : <span className="text-base leading-none">{emoji}</span>}
+                        <span>{locale === "zh" ? labelZh : labelEn}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Hint to tap again to deselect */}
                 {myStatus && (
-                  <button onClick={() => handleStatus(null)} disabled={pendingStatus !== null}
-                    className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium text-gray-400 hover:text-red-400 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all disabled:opacity-40">
-                    {pendingStatus === "remove"
-                      ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                      : <FiX className="text-xs" />}
-                    {locale === "zh" ? "移除" : "Remove"}
-                  </button>
+                  <p className="text-[10px] text-gray-400 mt-1.5 text-center">
+                    {locale === "zh" ? "再次点击可取消" : "Tap again to remove"}
+                  </p>
                 )}
               </div>
 
-              {/* Counts bar */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* 3. Reader counts — compact row */}
+              <div className="grid grid-cols-3 gap-2">
                 {STATUS_BTNS.map(({ key, emoji, labelZh, labelEn }) => (
-                  <div key={key} className="text-center py-3 bg-gray-50 rounded-xl border border-cream-100">
-                    <div className="text-xl mb-0.5">{emoji}</div>
-                    <div className="text-xl font-bold text-forest-800">{statusCounts[key]}</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">{locale === "zh" ? labelZh : labelEn}</div>
+                  <div key={key} className="flex flex-col items-center py-2.5 bg-gray-50 rounded-xl border border-cream-100">
+                    <span className="text-lg leading-none mb-1">{emoji}</span>
+                    <span className="text-lg font-bold text-forest-800 leading-none">{statusCounts[key]}</span>
+                    <span className="text-[9px] text-gray-400 mt-0.5">{locale === "zh" ? labelZh : labelEn}</span>
                   </div>
                 ))}
               </div>
-            </div>
 
-            {/* Read button — requires login */}
-            {(book.fileUrl || book.readLink) && (
-              <div className="mt-5">
-                <ReadButton book={book} session={session} locale={locale} router={router} />
-              </div>
-            )}
-
-            {/* Share section */}
-            <div className="mt-5 space-y-3">
-              {/* Write a post button */}
-              <div className="flex items-center gap-3 flex-wrap">
+              {/* 4. Share section */}
+              <div className="flex items-center gap-2 flex-wrap">
                 {session ? (
                   <Link href={`/share?book=${book.id}`}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-brand">
+                    className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-brand">
                     <FiShare2 />
                     {t.books.share_book}
                   </Link>
@@ -550,16 +562,16 @@ export function BookDetailClient({ book }: { book: Book }) {
                       toast.error(locale === "zh" ? "请先登录后再分享" : "Please log in to share");
                       router.push(`/login?callbackUrl=/share?book=${book.id}`);
                     }}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-brand">
+                    className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-brand">
                     <FiShare2 />
                     {t.books.share_book}
                   </button>
                 )}
                 <button
                   onClick={() => setShowShareTray(v => !v)}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-cream-200 hover:border-brand-200 hover:bg-brand-50/40 text-gray-600 hover:text-brand-600 rounded-xl text-sm font-medium transition-all">
-                  <FiShare2 className="text-xs" />
-                  {locale === "zh" ? "分享到社交媒体" : "Share on Social"}
+                  className="flex items-center gap-1.5 px-4 py-2.5 border border-cream-200 hover:border-brand-200 hover:bg-brand-50/40 text-gray-500 hover:text-brand-600 rounded-xl text-sm font-medium transition-all">
+                  <FiShare2 className="text-sm" />
+                  <span className="hidden sm:inline">{locale === "zh" ? "社交分享" : "Social"}</span>
                 </button>
               </div>
 

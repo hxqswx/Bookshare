@@ -117,39 +117,50 @@ export function BooksClient({
     router.push(`/books?${buildParams({ read: newMode })}`);
   };
 
-  const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB (Vercel serverless body limit)
+  const MAX_UPLOAD_BYTES = 200 * 1024 * 1024; // 200 MB — client upload bypasses serverless limit
+
+  const EXT_TO_TYPE: Record<string, string> = {
+    pdf: "pdf",
+    epub: "epub",
+    txt: "txt",
+  };
 
   const handleFileUpload = async (file: File) => {
     if (file.size > MAX_UPLOAD_BYTES) {
       toast.error(
         locale === "zh"
-          ? `文件过大（最大 4 MB）。超大文件请使用外部链接。`
-          : `File too large (max 4 MB). Use an external link for larger files.`
+          ? `文件过大（最大 200 MB）`
+          : `File too large (max 200 MB)`
       );
       return;
     }
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    const fileType = EXT_TO_TYPE[ext];
+    if (!fileType) {
+      toast.error(locale === "zh" ? "仅支持 PDF、EPUB、TXT" : "Only PDF, EPUB, TXT are supported");
+      return;
+    }
+
     setUploadState("uploading");
     setUploadFileName(file.name);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5 * 60 * 1000);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: form,
-        signal: controller.signal,
+      // Direct client-side upload to Vercel Blob — bypasses serverless body limit
+      const { upload } = await import("@vercel/blob/client");
+      const blob = await upload(file.name, file, {
+        access: "private",
+        handleUploadUrl: "/api/upload/direct",
+        clientPayload: JSON.stringify({ type: "book" }),
+        onUploadProgress: ({ percentage }) => {
+          // percentage is available for progress UI if needed
+          console.log(`[upload] ${file.name}: ${percentage}%`);
+        },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? (locale === "zh" ? "上传失败" : "Upload failed"));
-      setNewBook(b => ({ ...b, fileUrl: data.url, fileType: data.fileType }));
+      setNewBook(b => ({ ...b, fileUrl: blob.url, fileType }));
       setUploadState("done");
     } catch (err) {
       setUploadState("error");
       const msg = err instanceof Error ? err.message : (locale === "zh" ? "上传失败，请重试" : "Upload failed");
       toast.error(msg);
-    } finally {
-      clearTimeout(timer);
     }
   };
 
@@ -569,28 +580,19 @@ export function BooksClient({
               </div>
 
               <form onSubmit={handleAddBook} className="p-6 space-y-4">
+                {/* Title + Author in one row */}
                 <div className="grid grid-cols-2 gap-3">
                   <ModalInput
-                    label={locale === "zh" ? "英文书名 *" : "Title *"}
+                    label={locale === "zh" ? "书名 *" : "Title *"}
                     value={newBook.title}
-                    onChange={(v) => setNewBook({ ...newBook, title: v })}
+                    onChange={(v) => setNewBook({ ...newBook, title: v, titleZh: v })}
                     required
-                  />
-                  <ModalInput
-                    label={locale === "zh" ? "中文书名" : "Chinese Title"}
-                    value={newBook.titleZh}
-                    onChange={(v) => setNewBook({ ...newBook, titleZh: v })}
                   />
                   <ModalInput
                     label={locale === "zh" ? "作者 *" : "Author *"}
                     value={newBook.author}
-                    onChange={(v) => setNewBook({ ...newBook, author: v })}
+                    onChange={(v) => setNewBook({ ...newBook, author: v, authorZh: v })}
                     required
-                  />
-                  <ModalInput
-                    label={locale === "zh" ? "作者（中文）" : "Author (Chinese)"}
-                    value={newBook.authorZh}
-                    onChange={(v) => setNewBook({ ...newBook, authorZh: v })}
                   />
                 </div>
                 <ModalInput
@@ -703,7 +705,7 @@ export function BooksClient({
                           <>
                             <FiUploadCloud className="text-2xl text-gray-400" />
                             <span className="text-xs font-medium text-gray-600">{locale === "zh" ? "点击上传 PDF / EPUB / TXT" : "Click to upload PDF / EPUB / TXT"}</span>
-                            <span className="text-[11px] text-gray-400">{locale === "zh" ? "最大 4 MB · 超大文件用外链" : "Max 4 MB · use link for larger files"}</span>
+                            <span className="text-[11px] text-gray-400">{locale === "zh" ? "最大 200 MB · PDF / EPUB / TXT" : "Max 200 MB · PDF / EPUB / TXT"}</span>
                           </>
                         )}
                       </label>

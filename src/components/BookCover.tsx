@@ -18,6 +18,33 @@ export function BookCover({ src, alt, title, fill = true, className = "object-co
     return <PlaceholderCover title={title} />;
   }
 
+  // Use a plain <img> for all external URLs to avoid Next.js optimization proxy
+  // being blocked by CDN hotlink protection (Douban, etc.) on mobile/tablet
+  const isExternal = imgSrc.startsWith("http://") || imgSrc.startsWith("https://");
+
+  if (isExternal) {
+    if (fill) {
+      return (
+        <img
+          src={imgSrc}
+          alt={alt}
+          className={`absolute inset-0 w-full h-full ${className}`}
+          onError={() => setImgSrc(null)}
+          loading="lazy"
+        />
+      );
+    }
+    return (
+      <img
+        src={imgSrc}
+        alt={alt}
+        className={className}
+        onError={() => setImgSrc(null)}
+        loading="lazy"
+      />
+    );
+  }
+
   return (
     <Image
       src={imgSrc}
@@ -25,11 +52,6 @@ export function BookCover({ src, alt, title, fill = true, className = "object-co
       fill={fill}
       className={className}
       onError={() => setImgSrc(null)}
-      unoptimized={
-        imgSrc.startsWith("https://covers.openlibrary.org") ||
-        imgSrc.startsWith("https://api.dicebear.com") ||
-        imgSrc.startsWith("https://img") // Douban CDN
-      }
     />
   );
 }

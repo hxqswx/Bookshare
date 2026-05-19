@@ -292,40 +292,42 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
     setEditUploadName(book.fileUrl ? (book.fileUrl.split("/").pop() ?? "") : "");
   };
 
-  const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB
+  const MAX_UPLOAD_BYTES = 200 * 1024 * 1024; // 200 MB — client upload bypasses serverless limit
+
+  const ADMIN_EXT_TO_TYPE: Record<string, string> = { pdf: "pdf", epub: "epub", txt: "txt" };
 
   const handleEditFileUpload = async (file: File) => {
     if (!editBook) return;
     if (file.size > MAX_UPLOAD_BYTES) {
       toast.error(
         locale === "zh"
-          ? "文件过大（最大 4 MB）。超大文件请使用外部链接。"
-          : "File too large (max 4 MB). Use an external link for larger files."
+          ? "文件过大（最大 200 MB）"
+          : "File too large (max 200 MB)"
       );
+      return;
+    }
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    const fileType = ADMIN_EXT_TO_TYPE[ext];
+    if (!fileType) {
+      toast.error(locale === "zh" ? "仅支持 PDF、EPUB、TXT" : "Only PDF, EPUB, TXT are supported");
       return;
     }
     setEditUploadState("uploading");
     setEditUploadName(file.name);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5 * 60 * 1000);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: form,
-        signal: controller.signal,
+      // Direct client-side upload to Vercel Blob — bypasses serverless body limit
+      const { upload } = await import("@vercel/blob/client");
+      const blob = await upload(file.name, file, {
+        access: "private",
+        handleUploadUrl: "/api/upload/direct",
+        clientPayload: JSON.stringify({ type: "book" }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? (locale === "zh" ? "上传失败" : "Upload failed"));
-      setEditBook(b => b ? { ...b, fileUrl: data.url, fileType: data.fileType } : b);
+      setEditBook(b => b ? { ...b, fileUrl: blob.url, fileType } : b);
       setEditUploadState("done");
     } catch (err) {
       setEditUploadState("error");
       const msg = err instanceof Error ? err.message : (locale === "zh" ? "上传失败，请重试" : "Upload failed");
       toast.error(msg);
-    } finally {
-      clearTimeout(timer);
     }
   };
 
@@ -817,14 +819,12 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
               <div className="p-6 space-y-4">
                 {/* Title / Author grid */}
                 <div className="grid grid-cols-2 gap-3">
-                  <AdminInput label={locale === "zh" ? "英文书名 *" : "Title *"}
-                    value={editBook.title} onChange={v => setEditBook(b => b ? { ...b, title: v } : b)} required />
-                  <AdminInput label={locale === "zh" ? "中文书名" : "Chinese Title"}
-                    value={editBook.titleZh} onChange={v => setEditBook(b => b ? { ...b, titleZh: v } : b)} />
+                  <AdminInput label={locale === "zh" ? "书名 *" : "Title *"}
+                    value={editBook.title}
+                    onChange={v => setEditBook(b => b ? { ...b, title: v, titleZh: v } : b)} required />
                   <AdminInput label={locale === "zh" ? "作者 *" : "Author *"}
-                    value={editBook.author} onChange={v => setEditBook(b => b ? { ...b, author: v } : b)} required />
-                  <AdminInput label={locale === "zh" ? "作者（中文）" : "Author (ZH)"}
-                    value={editBook.authorZh} onChange={v => setEditBook(b => b ? { ...b, authorZh: v } : b)} />
+                    value={editBook.author}
+                    onChange={v => setEditBook(b => b ? { ...b, author: v, authorZh: v } : b)} required />
                 </div>
 
                 {/* Cover URL */}
@@ -857,18 +857,10 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                 {/* Description */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
-                    {locale === "zh" ? "简介（英文）" : "Description"}
+                    {locale === "zh" ? "简介" : "Description"}
                   </label>
-                  <textarea rows={2} value={editBook.description}
-                    onChange={e => setEditBook(b => b ? { ...b, description: e.target.value } : b)}
-                    className="w-full px-4 py-2.5 border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none text-sm text-gray-700" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
-                    {locale === "zh" ? "简介（中文）" : "Description (ZH)"}
-                  </label>
-                  <textarea rows={2} value={editBook.descriptionZh}
-                    onChange={e => setEditBook(b => b ? { ...b, descriptionZh: e.target.value } : b)}
+                  <textarea rows={3} value={editBook.description}
+                    onChange={e => setEditBook(b => b ? { ...b, description: e.target.value, descriptionZh: e.target.value } : b)}
                     className="w-full px-4 py-2.5 border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none text-sm text-gray-700" />
                 </div>
 
