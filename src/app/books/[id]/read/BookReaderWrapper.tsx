@@ -14,6 +14,19 @@ interface Book {
   readLink: string | null;
 }
 
+/**
+ * Vercel Blob private-store URLs cannot be fetched directly from the browser.
+ * Wrap them with /api/file?url=... so the server generates a presigned URL.
+ * Public URLs (e.g. external links) pass through unchanged.
+ */
+function toReadableUrl(fileUrl: string | null): string | null {
+  if (!fileUrl) return null;
+  if (fileUrl.includes(".blob.vercel-storage.com")) {
+    return `/api/file?url=${encodeURIComponent(fileUrl)}`;
+  }
+  return fileUrl;
+}
+
 export function BookReaderWrapper({
   book,
   initialPage,
@@ -22,5 +35,9 @@ export function BookReaderWrapper({
   initialPage: number;
 }) {
   const { locale } = useLanguage();
-  return <BookReader book={book} locale={locale} initialPage={initialPage} />;
+  const readableBook = {
+    ...book,
+    fileUrl: toReadableUrl(book.fileUrl),
+  };
+  return <BookReader book={readableBook} locale={locale} initialPage={initialPage} />;
 }

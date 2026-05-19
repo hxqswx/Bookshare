@@ -56,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const blob = await put(file.name, file, {
-      access: "public",
+      access: "private",   // store is private — public access would be rejected
       addRandomSuffix: true,
     });
 
