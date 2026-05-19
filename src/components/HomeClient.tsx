@@ -813,11 +813,17 @@ function DailyCheckinWidget({ locale, session }: { locale: string; session: Sess
                 <div
                   title={pages ? `${pages}${locale === "zh" ? "页" : " pages"}` : undefined}
                   className={`
-                    w-full aspect-square rounded-md transition-all
+                    w-full aspect-square rounded-md transition-all flex items-center justify-center
                     ${heatColor(pages)}
                     ${isToday ? "ring-2 ring-offset-1 ring-brand-500" : ""}
                   `}
-                />
+                >
+                  {pages > 0 && (
+                    <span className={`text-[9px] font-bold leading-none ${pages > 10 ? "text-white" : "text-brand-700"}`}>
+                      {pages}
+                    </span>
+                  )}
+                </div>
                 <span className={`text-[9px] font-semibold ${isToday ? "text-brand-600" : "text-gray-400"}`}>
                   {label}
                 </span>
