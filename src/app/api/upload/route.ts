@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { put } from "@vercel/blob";
 
-const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
+// Vercel serverless request-body limit is 4.5 MB; stay safely under it.
+const MAX_BYTES = 4 * 1024 * 1024; // 4 MB
 
 const EXT_TO_TYPE: Record<string, string> = {
   pdf:  "pdf",
@@ -11,28 +12,18 @@ const EXT_TO_TYPE: Record<string, string> = {
   txt:  "txt",
 };
 
-const ALLOWED_MIME = [
-  "application/pdf",
-  "application/epub+zip",
-  "text/plain",
-  "text/plain; charset=utf-8",
-  "text/plain;charset=utf-8",
-  "application/octet-stream", // some browsers send .txt as octet-stream
-];
-
 /**
- * POST /api/upload
+ * POST /api/upload   (multipart/form-data, field name: "file")
  *
- * Vercel Blob client-upload handshake.
- * Phase 1 – "generate-client-token": returns a signed token for the browser.
- * Phase 2 – "blob.upload-completed": acknowledged but no server-side work needed.
+ * The browser sends the file to *our* server; the server calls put() and
+ * forwards it to Vercel Blob.  This avoids the browser ever talking directly
+ * to vercel.com/api/blob, so there are no CORS issues regardless of how the
+ * Blob store is configured.
  *
- * NOTE: onUploadCompleted is intentionally omitted.
- * When it is present, handleUpload embeds a callbackUrl in the client token and
- * Vercel's CDN must POST to that URL before the upload is considered complete.
- * This makes uploads hang in local dev (localhost unreachable from Vercel) and
- * can stall production uploads if the webhook is slow. Since we only need the
- * blob URL (returned to the browser directly), no server-side callback is required.
+ * Limitation: Vercel serverless request bodies are capped at 4.5 MB.
+ * Clients must enforce MAX_BYTES before uploading.
+ *
+ * Returns: { url: string, fileType: string }
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const session = await getServerSession(authOptions);
@@ -41,29 +32,37 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const body = (await request.json()) as HandleUploadBody;
+    const formData = await request.formData();
+    const file = formData.get("file");
 
-    const jsonResponse = await handleUpload({
-      body,
-      request: request as never,
-      onBeforeGenerateToken: async (pathname: string) => {
-        const ext = (pathname.split(".").pop() ?? "").toLowerCase();
-        if (!EXT_TO_TYPE[ext]) {
-          throw new Error("Only PDF, EPUB, and TXT files are supported");
-        }
-        return {
-          allowedContentTypes: ALLOWED_MIME,
-          maximumSizeInBytes: MAX_BYTES,
-          addRandomSuffix: true,
-          // No callbackUrl → no webhook → upload completes immediately
-        };
-      },
-      // onUploadCompleted deliberately omitted — see comment above
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    if (file.size > MAX_BYTES) {
+      return NextResponse.json(
+        { error: `File too large (max 4 MB). For larger files use an external link.` },
+        { status: 413 }
+      );
+    }
+
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    const fileType = EXT_TO_TYPE[ext];
+    if (!fileType) {
+      return NextResponse.json(
+        { error: "Only PDF, EPUB, and TXT files are supported" },
+        { status: 400 }
+      );
+    }
+
+    const blob = await put(file.name, file, {
+      access: "public",
+      addRandomSuffix: true,
     });
 
-    return NextResponse.json(jsonResponse);
+    return NextResponse.json({ url: blob.url, fileType });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Upload failed";
-    return NextResponse.json({ error: msg }, { status: 400 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

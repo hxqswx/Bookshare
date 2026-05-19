@@ -292,30 +292,37 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
     setEditUploadName(book.fileUrl ? (book.fileUrl.split("/").pop() ?? "") : "");
   };
 
+  const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB
+
   const handleEditFileUpload = async (file: File) => {
     if (!editBook) return;
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error(
+        locale === "zh"
+          ? "文件过大（最大 4 MB）。超大文件请使用外部链接。"
+          : "File too large (max 4 MB). Use an external link for larger files."
+      );
+      return;
+    }
     setEditUploadState("uploading");
     setEditUploadName(file.name);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 min timeout
+    const timer = setTimeout(() => controller.abort(), 5 * 60 * 1000);
     try {
-      const { upload } = await import("@vercel/blob/client");
-      const blob = await upload(file.name, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-        abortSignal: controller.signal,
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
       });
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      const typeMap: Record<string, string> = { pdf: "pdf", epub: "epub", txt: "txt" };
-      setEditBook(b => b ? { ...b, fileUrl: blob.url, fileType: typeMap[ext] ?? "pdf" } : b);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? (locale === "zh" ? "上传失败" : "Upload failed"));
+      setEditBook(b => b ? { ...b, fileUrl: data.url, fileType: data.fileType } : b);
       setEditUploadState("done");
     } catch (err) {
       setEditUploadState("error");
-      const raw = err instanceof Error ? err.message : String(err);
-      const isCors = raw.toLowerCase().includes("cors") || raw.toLowerCase().includes("failed to fetch") || raw.toLowerCase().includes("network");
-      const msg = isCors
-        ? (locale === "zh" ? "存储服务未正确配置，请联系管理员" : "Storage not configured — contact admin")
-        : (raw || (locale === "zh" ? "上传失败，请重试" : "Upload failed, please retry"));
+      const msg = err instanceof Error ? err.message : (locale === "zh" ? "上传失败，请重试" : "Upload failed");
       toast.error(msg);
     } finally {
       clearTimeout(timer);

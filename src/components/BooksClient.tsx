@@ -91,30 +91,37 @@ export function BooksClient({
     router.push(`/books?${params.toString()}`);
   };
 
+  const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB (Vercel serverless body limit)
+
   const handleFileUpload = async (file: File) => {
+    // Client-side size guard
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error(
+        locale === "zh"
+          ? `文件过大（最大 4 MB）。超大文件请使用外部链接。`
+          : `File too large (max 4 MB). Use an external link for larger files.`
+      );
+      return;
+    }
     setUploadState("uploading");
     setUploadFileName(file.name);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 min timeout
+    const timer = setTimeout(() => controller.abort(), 5 * 60 * 1000);
     try {
-      const { upload } = await import("@vercel/blob/client");
-      const blob = await upload(file.name, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-        abortSignal: controller.signal,
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: form,
+        signal: controller.signal,
       });
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      const typeMap: Record<string, string> = { pdf: "pdf", epub: "epub", txt: "txt" };
-      setNewBook(b => ({ ...b, fileUrl: blob.url, fileType: typeMap[ext] ?? "pdf" }));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? (locale === "zh" ? "上传失败" : "Upload failed"));
+      setNewBook(b => ({ ...b, fileUrl: data.url, fileType: data.fileType }));
       setUploadState("done");
     } catch (err) {
       setUploadState("error");
-      const raw = err instanceof Error ? err.message : String(err);
-      // CORS / network errors mean Blob storage is not linked to this domain in Vercel dashboard
-      const isCors = raw.toLowerCase().includes("cors") || raw.toLowerCase().includes("failed to fetch") || raw.toLowerCase().includes("network");
-      const msg = isCors
-        ? (locale === "zh" ? "存储服务未正确配置，请联系管理员" : "Storage not configured — contact admin")
-        : (raw || (locale === "zh" ? "上传失败，请重试" : "Upload failed, please retry"));
+      const msg = err instanceof Error ? err.message : (locale === "zh" ? "上传失败，请重试" : "Upload failed");
       toast.error(msg);
     } finally {
       clearTimeout(timer);
@@ -594,7 +601,7 @@ export function BooksClient({
                           <>
                             <FiUploadCloud className="text-2xl text-gray-400" />
                             <span className="text-xs font-medium text-gray-600">{locale === "zh" ? "点击上传 PDF / EPUB / TXT" : "Click to upload PDF / EPUB / TXT"}</span>
-                            <span className="text-[11px] text-gray-400">{locale === "zh" ? "最大 100 MB" : "Max 100 MB"}</span>
+                            <span className="text-[11px] text-gray-400">{locale === "zh" ? "最大 4 MB · 超大文件用外链" : "Max 4 MB · use link for larger files"}</span>
                           </>
                         )}
                       </label>
