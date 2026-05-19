@@ -12,7 +12,7 @@ import {
 } from "react-icons/fi";
 
 interface HomeData {
-  stats: { bookCount: number; userCount: number; postCount: number };
+  stats: { bookCount: number; userCount: number; postCount: number; newUsersThisMonth: number };
   recentPosts: Array<{
     id: string; content: string; type: string; createdAt: Date | string;
     user: { id: string; name: string; image: string | null };
@@ -113,7 +113,7 @@ export function HomeClient({ data }: { data: HomeData }) {
 
           {/* ── Right visual ── */}
           <div className="relative hidden lg:block h-[520px]">
-            <HeroIllustration books={data.featuredBooks.slice(0, 3)} locale={locale} />
+            <HeroIllustration books={data.featuredBooks.slice(0, 3)} locale={locale} newUsersThisMonth={data.stats.newUsersThisMonth} />
           </div>
         </div>
 
@@ -423,7 +423,7 @@ export function HomeClient({ data }: { data: HomeData }) {
 }
 
 /* ── Hero Illustration ── */
-function HeroIllustration({ books, locale }: { books: HomeData["featuredBooks"]; locale: string }) {
+function HeroIllustration({ books, locale, newUsersThisMonth }: { books: HomeData["featuredBooks"]; locale: string; newUsersThisMonth: number }) {
   const cards = [
     { rotate: "-6deg", x: "5%",  y: "5%",  delay: 0 },
     { rotate: "4deg",  x: "38%", y: "18%", delay: 0.15 },
@@ -485,7 +485,7 @@ function HeroIllustration({ books, locale }: { books: HomeData["featuredBooks"];
         <div className="w-10 h-10 rounded-xl bg-brand-gradient flex items-center justify-center text-white text-xl">🔥</div>
         <div>
           <p className="text-xs text-gray-400">{locale === "zh" ? "本月新增" : "This month"}</p>
-          <p className="text-lg font-bold text-forest-800">+128 {locale === "zh" ? "位书友" : "readers"}</p>
+          <p className="text-lg font-bold text-forest-800">+{newUsersThisMonth} {locale === "zh" ? "位书友" : "readers"}</p>
         </div>
       </motion.div>
     </div>

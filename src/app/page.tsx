@@ -5,11 +5,16 @@ export const revalidate = 60; // revalidate every 60 seconds
 
 async function getStats() {
   try {
-    const [bookCount, userCount, postCount, recentPosts, featuredBooks] =
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const [bookCount, userCount, postCount, newUsersThisMonth, recentPosts, featuredBooks] =
       await Promise.all([
         prisma.book.count(),
         prisma.user.count(),
         prisma.post.count(),
+        prisma.user.count({ where: { createdAt: { gte: monthStart } } }),
         prisma.post.findMany({
           take: 6,
           orderBy: { createdAt: "desc" },
@@ -50,14 +55,14 @@ async function getStats() {
       .sort((a, b) => b.booksFinished - a.booksFinished);
 
     return {
-      stats: { bookCount, userCount, postCount },
+      stats: { bookCount, userCount, postCount, newUsersThisMonth },
       recentPosts,
       featuredBooks,
       leaderboard: sortedLeaderboard,
     };
   } catch {
     return {
-      stats: { bookCount: 0, userCount: 0, postCount: 0 },
+      stats: { bookCount: 0, userCount: 0, postCount: 0, newUsersThisMonth: 0 },
       recentPosts: [],
       featuredBooks: [],
       leaderboard: [],
