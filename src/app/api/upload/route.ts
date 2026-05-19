@@ -54,7 +54,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         };
       },
       onUploadCompleted: async ({ blob }) => {
-        // Optional hook — runs after the upload is confirmed
+        // This webhook is called by Vercel infrastructure after upload.
+        // In local dev (localhost) it won't fire — that's expected and fine.
         console.log("Book file uploaded:", blob.pathname, blob.url);
       },
     });
