@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import type { Metadata } from "next";
 import { BookReaderWrapper } from "./BookReaderWrapper";
 
@@ -39,6 +41,12 @@ export default async function ReadPage({
   params: { id: string };
   searchParams: { page?: string };
 }) {
+  // Auth gate: only logged-in users can read
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    redirect(`/login?callbackUrl=/books/${params.id}/read`);
+  }
+
   const book = await getBook(params.id);
   if (!book) notFound();
 

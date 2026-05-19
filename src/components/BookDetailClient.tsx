@@ -257,6 +257,58 @@ function SocialShareTray({
   );
 }
 
+/* ── Read Button (login-gated) ── */
+function ReadButton({
+  book, session, locale, router,
+}: {
+  book: Book;
+  session: ReturnType<typeof useSession>["data"];
+  locale: string;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const label = locale === "zh"
+    ? (book.fileUrl ? "开始阅读" : book.readLink?.includes("amazon") ? "Kindle 阅读" : "在线阅读")
+    : (book.fileUrl ? "Read Now" : book.readLink?.includes("amazon") ? "Read on Kindle" : "Read Online");
+
+  const btnClass = "inline-flex items-center gap-2 px-6 py-3 bg-forest-600 hover:bg-forest-700 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-lg";
+
+  if (!session) {
+    return (
+      <button
+        onClick={() => {
+          toast.error(locale === "zh" ? "请先登录后才能阅读" : "Please log in to read");
+          router.push(`/login?callbackUrl=/books/${book.id}/read`);
+        }}
+        className={btnClass}
+      >
+        <FiBookOpen />
+        {label}
+      </button>
+    );
+  }
+
+  if (book.fileUrl) {
+    return (
+      <Link href={`/books/${book.id}/read`} className={btnClass}>
+        <FiBookOpen />
+        {label}
+      </Link>
+    );
+  }
+
+  return (
+    <a
+      href={book.readLink!}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={btnClass}
+    >
+      <FiBookOpen />
+      {label}
+    </a>
+  );
+}
+
 export function BookDetailClient({ book }: { book: Book }) {
   const { locale, t } = useLanguage();
   const { data: session } = useSession();
@@ -481,20 +533,10 @@ export function BookDetailClient({ book }: { book: Book }) {
               </div>
             </div>
 
-            {/* Read button */}
+            {/* Read button — requires login */}
             {(book.fileUrl || book.readLink) && (
               <div className="mt-5">
-                <Link
-                  href={book.fileUrl ? `/books/${book.id}/read` : book.readLink!}
-                  target={book.readLink && !book.fileUrl ? "_blank" : undefined}
-                  rel={book.readLink && !book.fileUrl ? "noopener noreferrer" : undefined}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-forest-600 hover:bg-forest-700 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-lg"
-                >
-                  <FiBookOpen />
-                  {locale === "zh"
-                    ? (book.fileUrl ? "开始阅读" : book.readLink?.includes("amazon") ? "Kindle 阅读" : "在线阅读")
-                    : (book.fileUrl ? "Read Now" : book.readLink?.includes("amazon") ? "Read on Kindle" : "Read Online")}
-                </Link>
+                <ReadButton book={book} session={session} locale={locale} router={router} />
               </div>
             )}
 
@@ -502,11 +544,23 @@ export function BookDetailClient({ book }: { book: Book }) {
             <div className="mt-5 space-y-3">
               {/* Write a post button */}
               <div className="flex items-center gap-3 flex-wrap">
-                <Link href={`/share?book=${book.id}`}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-brand">
-                  <FiShare2 />
-                  {t.books.share_book}
-                </Link>
+                {session ? (
+                  <Link href={`/share?book=${book.id}`}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-brand">
+                    <FiShare2 />
+                    {t.books.share_book}
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => {
+                      toast.error(locale === "zh" ? "请先登录后再分享" : "Please log in to share");
+                      router.push(`/login?callbackUrl=/share?book=${book.id}`);
+                    }}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-brand">
+                    <FiShare2 />
+                    {t.books.share_book}
+                  </button>
+                )}
                 <button
                   onClick={() => setShowShareTray(v => !v)}
                   className="inline-flex items-center gap-2 px-4 py-2.5 border border-cream-200 hover:border-brand-200 hover:bg-brand-50/40 text-gray-600 hover:text-brand-600 rounded-xl text-sm font-medium transition-all">

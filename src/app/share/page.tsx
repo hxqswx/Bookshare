@@ -148,7 +148,8 @@ function SharePageContent() {
 
   const handleLike = async (postId: string) => {
     if (!session) {
-      toast.error(locale === "zh" ? "请先登录" : "Please log in");
+      toast.error(locale === "zh" ? "请先登录后再操作" : "Please log in first");
+      router.push("/login");
       return;
     }
     try {

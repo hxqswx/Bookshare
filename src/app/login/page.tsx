@@ -21,6 +21,7 @@ function LoginPageContent() {
   const { t, locale } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,7 +59,7 @@ function LoginPageContent() {
       redirect: false,
     });
     if (result?.ok) {
-      router.push("/");
+      router.push(callbackUrl);
       router.refresh();
     } else {
       setErrorMsg(locale === "zh" ? "邮箱或密码错误，请重试" : "Incorrect email or password, please try again.");
@@ -68,7 +69,7 @@ function LoginPageContent() {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    await signIn("google", { callbackUrl: "/" });
+    await signIn("google", { callbackUrl });
   };
 
   return (
