@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
@@ -18,13 +18,33 @@ const GoogleIcon = () => (
   </svg>
 );
 
-export default function LoginPage() {
+function LoginPageContent() {
   const { t, locale } = useLanguage();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Show error from NextAuth ?error= param (e.g. OAuthAccountNotLinked)
+  useEffect(() => {
+    const error = searchParams.get("error");
+    if (!error) return;
+    const messages: Record<string, [string, string]> = {
+      OAuthAccountNotLinked: [
+        "该邮箱已用其他方式注册，请使用邮箱+密码登录",
+        "This email is registered with a different method. Please sign in with email & password.",
+      ],
+      Callback: ["登录失败，请重试", "Sign-in failed, please try again"],
+      OAuthSignin: ["Google 登录出错，请重试", "Google sign-in error, please try again"],
+      OAuthCallback: ["Google 授权失败，请重试", "Google authorization failed, please try again"],
+      Default: ["登录出错，请重试", "Sign-in error, please try again"],
+    };
+    const [zh, en] = messages[error] ?? messages.Default;
+    toast.error(locale === "zh" ? zh : en, { duration: 6000 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,5 +206,13 @@ export default function LoginPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginPageContent />
+    </Suspense>
   );
 }
