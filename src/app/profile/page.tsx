@@ -439,15 +439,30 @@ export default function ProfilePage() {
       <div className="bg-gradient-to-br from-forest-700 via-forest-600 to-forest-500 pt-20 pb-16">
         <div className="max-w-3xl mx-auto px-4 text-center">
           {/* Avatar with edit button */}
-          <div className="relative inline-block mb-4">
-            <Avatar name={session.user?.name} image={session.user?.image} size={88} />
+          <div className="relative inline-block mb-5">
+            {/* Glow ring */}
+            <div className="absolute inset-0 rounded-full bg-white/20 blur-md scale-110 pointer-events-none" />
+            {/* Clickable avatar with camera overlay */}
             <button
               onClick={() => setShowEditModal(true)}
-              className="absolute -bottom-1 -right-1 w-7 h-7 bg-white rounded-full flex items-center justify-center shadow-md hover:bg-cream-50 transition-colors"
-              title={locale === "zh" ? "编辑资料" : "Edit profile"}
+              className="relative group focus:outline-none"
+              title={locale === "zh" ? "点击更换头像" : "Click to change avatar"}
+            >
+              <div className="rounded-full ring-4 ring-white/40 shadow-2xl overflow-hidden">
+                <Avatar name={session.user?.name} image={session.user?.image} size={96} />
+              </div>
+              {/* Camera hover overlay */}
+              <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <FiCamera className="text-white drop-shadow" size={22} />
+              </div>
+            </button>
+            {/* Edit badge */}
+            <div
+              onClick={() => setShowEditModal(true)}
+              className="absolute -bottom-1 -right-1 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform"
             >
               <FiEdit2 size={13} className="text-forest-600" />
-            </button>
+            </div>
           </div>
 
           <h1 className="font-serif text-2xl sm:text-3xl font-bold text-white mb-1">

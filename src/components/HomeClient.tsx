@@ -486,34 +486,60 @@ export function HomeClient({ data }: { data: HomeData }) {
                 {data.leaderboard.length === 0 ? (
                   <p className="p-8 text-center text-sm text-gray-400">{locale === "zh" ? "暂无数据" : "No data yet"}</p>
                 ) : (
-                  data.leaderboard.map((u, i) => (
+                  data.leaderboard.map((u, i) => {
+                    // Ring colour for top 3
+                    const ringStyle =
+                      i === 0 ? { boxShadow: "0 0 0 3px #f59e0b, 0 0 0 5px #fde68a" } :
+                      i === 1 ? { boxShadow: "0 0 0 3px #9ca3af, 0 0 0 5px #e5e7eb" } :
+                      i === 2 ? { boxShadow: "0 0 0 3px #d97706, 0 0 0 5px #fde68a88" } :
+                      undefined;
+                    const badgeLabel = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+                    const rowBg = i === 0 ? "bg-amber-50/60" : "";
+
+                    return (
                     <motion.div
                       key={u.id}
                       initial={{ opacity: 0, x: 20 }}
                       whileInView={{ opacity: 1, x: 0 }}
                       viewport={{ once: true }}
                       transition={{ delay: i * 0.06 }}
-                      className="flex items-center gap-3 px-5 py-3.5 hover:bg-cream-50 transition-colors"
+                      className={`flex items-center gap-3 px-4 py-3 hover:bg-cream-50 transition-colors ${rowBg}`}
                     >
-                      <span className="text-lg w-7 text-center flex-shrink-0">
-                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : <span className="text-sm text-gray-400 font-semibold">{i + 1}</span>}
-                      </span>
-                      <Avatar name={u.name} image={u.image} size={34} />
+                      {/* Avatar with rank badge overlay */}
+                      <div className="relative flex-shrink-0">
+                        <div style={ringStyle} className="rounded-full">
+                          <Avatar name={u.name} image={u.image} size={38} />
+                        </div>
+                        {/* Rank badge */}
+                        <div className="absolute -bottom-1 -right-1 leading-none">
+                          {badgeLabel ? (
+                            <span className="text-sm drop-shadow">{badgeLabel}</span>
+                          ) : (
+                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-[9px] font-bold text-gray-500 shadow-sm">
+                              {i + 1}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{u.name}</p>
+                        <p className={`text-sm font-semibold truncate ${i === 0 ? "text-amber-700" : "text-gray-800"}`}>
+                          {u.name}
+                        </p>
                         <p className="text-xs text-gray-400">
-                          📚 {u.booksFinished}{locale === "zh" ? "本" : " books"}
+                          📚 {u.booksFinished}{locale === "zh" ? "本" : " bk"}
                           {u.pagesThisMonth > 0 && (
-                            <> · 📄 {u.pagesThisMonth}{locale === "zh" ? "页" : " pages"}</>
+                            <> · 📄 {u.pagesThisMonth}{locale === "zh" ? "页" : " pg"}</>
                           )}
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-bold text-brand-600">{u.score}</p>
+                        <p className={`text-xs font-bold ${i === 0 ? "text-amber-600" : "text-brand-600"}`}>{u.score}</p>
                         <p className="text-[10px] text-gray-400">{locale === "zh" ? "积分" : "pts"}</p>
                       </div>
                     </motion.div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

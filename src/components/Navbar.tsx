@@ -215,26 +215,48 @@ export function Avatar({
         src={src}
         alt={name ?? "Avatar"}
         style={{ width: size, height: size }}
-        className="rounded-full object-cover flex-shrink-0"
+        className="rounded-full object-cover object-center flex-shrink-0 shadow-sm"
         onError={() => setImgError(true)}
       />
     );
   }
 
-  const colors = [
-    "from-brand-400 to-brand-600",
-    "from-forest-400 to-forest-600",
-    "from-purple-400 to-purple-600",
-    "from-blue-400 to-blue-600",
-    "from-rose-400 to-rose-600",
+  // Richer palette — two-tone gradients
+  const palettes = [
+    { from: "#f59e0b", to: "#d97706" }, // amber
+    { from: "#10b981", to: "#059669" }, // emerald
+    { from: "#8b5cf6", to: "#7c3aed" }, // violet
+    { from: "#3b82f6", to: "#2563eb" }, // blue
+    { from: "#ec4899", to: "#db2777" }, // pink
+    { from: "#f97316", to: "#ea580c" }, // orange
+    { from: "#06b6d4", to: "#0891b2" }, // cyan
+    { from: "#84cc16", to: "#65a30d" }, // lime
   ];
-  const idx = name ? name.charCodeAt(0) % colors.length : 0;
+  const idx = name ? name.charCodeAt(0) % palettes.length : 0;
+  const { from, to } = palettes[idx];
+  const letter = name?.[0]?.toUpperCase() ?? "?";
+  const fontSize = Math.round(size * 0.42);
+
   return (
     <div
-      style={{ width: size, height: size }}
-      className={`rounded-full bg-gradient-to-br ${colors[idx]} flex items-center justify-center text-white font-bold flex-shrink-0`}
+      style={{
+        width: size,
+        height: size,
+        background: `linear-gradient(135deg, ${from}, ${to})`,
+        boxShadow: `0 2px 8px ${from}55`,
+      }}
+      className="rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 select-none"
     >
-      <span style={{ fontSize: size * 0.42 }}>{name?.[0]?.toUpperCase() ?? "?"}</span>
+      <span
+        style={{
+          fontSize,
+          lineHeight: 1,
+          textShadow: "0 1px 2px rgba(0,0,0,0.25)",
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {letter}
+      </span>
     </div>
   );
 }
