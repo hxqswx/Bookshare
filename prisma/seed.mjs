@@ -3,7 +3,38 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+const GENRES = [
+  { name: "Literary Fiction",  nameZh: "文学小说",  order: 1  },
+  { name: "Classic Fiction",   nameZh: "经典名著",  order: 2  },
+  { name: "Science Fiction",   nameZh: "科幻",      order: 3  },
+  { name: "Historical Fiction",nameZh: "历史小说",  order: 4  },
+  { name: "Fantasy",           nameZh: "奇幻",      order: 5  },
+  { name: "Dystopian Fiction", nameZh: "反乌托邦",  order: 6  },
+  { name: "Fiction",           nameZh: "小说",      order: 7  },
+  { name: "Mystery",           nameZh: "推理悬疑",  order: 8  },
+  { name: "History",           nameZh: "历史",      order: 9  },
+  { name: "Popular Science",   nameZh: "科普",      order: 10 },
+  { name: "Psychology",        nameZh: "心理学",    order: 11 },
+  { name: "Self-Help",         nameZh: "自我提升",  order: 12 },
+  { name: "Business",          nameZh: "商业",      order: 13 },
+  { name: "Finance",           nameZh: "财经",      order: 14 },
+  { name: "Memoir",            nameZh: "回忆录",    order: 15 },
+  { name: "Philosophy",        nameZh: "哲学",      order: 16 },
+];
+
 async function main() {
+  // ── Genres ───────────────────────────────────────────────────────────────
+  await Promise.all(
+    GENRES.map(g =>
+      prisma.genre.upsert({
+        where: { name: g.name },
+        update: { nameZh: g.nameZh, order: g.order },
+        create: g,
+      })
+    )
+  );
+  console.log("✅ Genres seeded.");
+
   // Create seed community users (for demo content only — not test login accounts)
   const password = await bcrypt.hash("seed_user_84hJk2!", 10);
 
@@ -174,7 +205,7 @@ async function main() {
     // ── International Books Popular in China ────────────────────────────
     prisma.book.upsert({
       where: { id: "book3" },
-      update: {},
+      update: { genre: "Popular Science" },
       create: {
         id: "book3",
         title: "Sapiens: A Brief History of Humankind",
@@ -185,7 +216,7 @@ async function main() {
         description:
           "A sweeping narrative of human history from the Stone Age to the twenty-first century.",
         descriptionZh: "从石器时代到21世纪，重新审视人类历史的宏观叙事。全球畅销书。",
-        genre: "History / Popular Science",
+        genre: "Popular Science",
         publishYear: 2011,
       },
     }),
@@ -324,7 +355,7 @@ async function main() {
 
     prisma.book.upsert({
       where: { id: "book16" },
-      update: {},
+      update: { genre: "Finance" },
       create: {
         id: "book16",
         title: "The Psychology of Money",
@@ -336,14 +367,14 @@ async function main() {
           "Timeless lessons on wealth, greed, and happiness — how ordinary people can build wealth through good behavior.",
         descriptionZh:
           "19个关于财富与人性的故事，揭示金钱决策背后的心理学。普通人如何通过行为积累财富。",
-        genre: "Finance / Psychology",
+        genre: "Finance",
         publishYear: 2020,
       },
     }),
 
     prisma.book.upsert({
       where: { id: "book17" },
-      update: {},
+      update: { genre: "Psychology" },
       create: {
         id: "book17",
         title: "Man's Search for Meaning",
@@ -355,7 +386,7 @@ async function main() {
           "A Holocaust survivor's account of finding purpose in suffering — the foundation of logotherapy.",
         descriptionZh:
           "奥斯威辛集中营幸存者、心理学家弗兰克尔讲述在极端苦难中寻找生命意义的故事。",
-        genre: "Psychology / Memoir",
+        genre: "Psychology",
         publishYear: 1946,
       },
     }),
@@ -381,7 +412,7 @@ async function main() {
 
     prisma.book.upsert({
       where: { id: "book19" },
-      update: {},
+      update: { genre: "Finance" },
       create: {
         id: "book19",
         title: "Rich Dad Poor Dad",
@@ -393,7 +424,7 @@ async function main() {
           "The #1 personal finance book of all time — what the rich teach their kids about money that the poor and middle class don't.",
         descriptionZh:
           "全球最畅销个人理财书。富人教给孩子的金钱理念，颠覆你对工作、财富和投资的认知。",
-        genre: "Finance / Self-Help",
+        genre: "Finance",
         publishYear: 1997,
       },
     }),

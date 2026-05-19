@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
@@ -25,9 +25,15 @@ interface Book {
   _count: { userBooks: number; posts: number };
 }
 
+interface GenreItem {
+  id: string;
+  name: string;
+  nameZh: string | null;
+}
+
 interface BooksData {
   books: Book[];
-  genres: string[];
+  genres: GenreItem[];
 }
 
 export function BooksClient({
@@ -51,6 +57,15 @@ export function BooksClient({
     cover: "", description: "", genre: "", publishYear: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [genreOptions, setGenreOptions] = useState<GenreItem[]>(initialData.genres);
+
+  // Keep genre options fresh if genres were added after page load
+  useEffect(() => {
+    fetch("/api/genres")
+      .then(r => r.json())
+      .then(setGenreOptions)
+      .catch(() => {});
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,15 +192,15 @@ export function BooksClient({
             </button>
             {initialData.genres.map((g) => (
               <button
-                key={g}
-                onClick={() => handleGenre(g)}
+                key={g.id}
+                onClick={() => handleGenre(g.name)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
-                  genre === g
+                  genre === g.name
                     ? "bg-forest-600 text-white border-forest-600 shadow-sm"
                     : "bg-white text-gray-600 border-cream-200 hover:border-forest-300 hover:text-forest-700"
                 }`}
               >
-                {g}
+                {locale === "zh" ? (g.nameZh || g.name) : g.name}
               </button>
             ))}
           </div>
@@ -430,12 +445,24 @@ export function BooksClient({
                   placeholder="https://..."
                 />
                 <div className="grid grid-cols-2 gap-3">
-                  <ModalInput
-                    label={locale === "zh" ? "分类 / Genre" : "Genre"}
-                    value={newBook.genre}
-                    onChange={(v) => setNewBook({ ...newBook, genre: v })}
-                    placeholder={locale === "zh" ? "如：文学、科技" : "e.g. Fiction, Tech"}
-                  />
+                  {/* Genre dropdown */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
+                      {locale === "zh" ? "分类" : "Genre"}
+                    </label>
+                    <select
+                      value={newBook.genre}
+                      onChange={e => setNewBook({ ...newBook, genre: e.target.value })}
+                      className="w-full px-3.5 py-2.5 border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 text-sm text-gray-700 bg-white transition-shadow appearance-none"
+                    >
+                      <option value="">{locale === "zh" ? "选择分类…" : "Select genre…"}</option>
+                      {genreOptions.map(g => (
+                        <option key={g.id} value={g.name}>
+                          {locale === "zh" ? (g.nameZh || g.name) : g.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <ModalInput
                     label={locale === "zh" ? "出版年份" : "Publish Year"}
                     value={newBook.publishYear}

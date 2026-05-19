@@ -7,7 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FiUsers, FiTrash2, FiShield, FiShieldOff,
   FiSearch, FiAlertTriangle, FiBook,
-  FiMessageSquare, FiHeart, FiStar,
+  FiMessageSquare, FiHeart, FiStar, FiTag,
+  FiEdit2, FiCheck, FiX, FiPlus,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 
@@ -30,10 +31,15 @@ interface AdminPost {
   book: { id: string; title: string; titleZh: string | null } | null;
   _count: { comments: number; likes: number };
 }
+interface AdminGenre {
+  id: string; name: string; nameZh: string | null;
+  order: number; bookCount: number;
+}
 type DeleteTarget =
   | { kind: "user";  item: User }
   | { kind: "book";  item: AdminBook }
-  | { kind: "post";  item: AdminPost };
+  | { kind: "post";  item: AdminPost }
+  | { kind: "genre"; item: AdminGenre };
 
 /* ─── Avatar colour ──────────────────────────────────────── */
 const GRAD = ["from-brand-400 to-brand-600","from-forest-400 to-forest-600",
@@ -48,7 +54,7 @@ const TYPE_EMOJI: Record<string, string> = {
 /* ─── Component ──────────────────────────────────────────── */
 export default function AdminClient({ currentUserId }: { currentUserId: string }) {
   const { locale } = useLanguage();
-  const [tab, setTab] = useState<"users" | "books" | "posts">("users");
+  const [tab, setTab] = useState<"users" | "books" | "posts" | "genres">("users");
   const [query, setQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -66,6 +72,21 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
   const [posts, setPosts]       = useState<AdminPost[]>([]);
   const [postsLoading, setPL]   = useState(false);
   const [postsFetched, setPoF]  = useState(false);
+
+  /* ── Genres ── */
+  const [genres, setGenres]     = useState<AdminGenre[]>([]);
+  const [genresLoading, setGL]  = useState(false);
+  const [genresFetched, setGF]  = useState(false);
+  // Inline add/edit state
+  const [editingGenreId, setEditingGenreId] = useState<string | null>(null);
+  const [editName, setEditName]   = useState("");
+  const [editNameZh, setEditNameZh] = useState("");
+  const [showAddGenre, setShowAddGenre] = useState(false);
+  const [newGenreName, setNewGenreName]   = useState("");
+  const [newGenreNameZh, setNewGenreNameZh] = useState("");
+  const [genreSaving, setGenreSaving] = useState(false);
+  // Book genre inline edit
+  const [bookGenreMap, setBookGenreMap] = useState<Record<string, string>>({});
 
   /* ── Fetch helpers ── */
   const fetchUsers = useCallback(async () => {
@@ -95,11 +116,21 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
     finally { setPL(false); }
   }, [locale]);
 
+  const fetchGenres = useCallback(async () => {
+    setGL(true);
+    try {
+      const d = await fetch("/api/admin/genres").then(r => r.json());
+      setGenres(d); setGF(true);
+    } catch { toast.error(locale === "zh" ? "加载失败" : "Failed to load"); }
+    finally { setGL(false); }
+  }, [locale]);
+
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => {
-    if (tab === "books" && !booksFetched) fetchBooks();
-    if (tab === "posts" && !postsFetched) fetchPosts();
-  }, [tab, booksFetched, postsFetched, fetchBooks, fetchPosts]);
+    if (tab === "books"  && !booksFetched)  fetchBooks();
+    if (tab === "posts"  && !postsFetched)  fetchPosts();
+    if (tab === "genres" && !genresFetched) fetchGenres();
+  }, [tab, booksFetched, postsFetched, genresFetched, fetchBooks, fetchPosts, fetchGenres]);
 
   /* ── Delete ── */
   const handleDelete = async () => {
@@ -118,6 +149,9 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
       } else if (kind === "book") {
         setBooks(p => p.filter(b => b.id !== item.id));
         toast.success(locale === "zh" ? "书籍已删除" : "Book deleted");
+      } else if (kind === "genre") {
+        setGenres(p => p.filter(g => g.id !== item.id));
+        toast.success(locale === "zh" ? "分类已删除" : "Genre deleted");
       } else {
         setPosts(p => p.filter(p2 => p2.id !== item.id));
         toast.success(locale === "zh" ? "帖子已删除" : "Post deleted");
@@ -168,6 +202,63 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
     } finally { setActionLoading(null); }
   };
 
+  /* ── Genre CRUD ── */
+  const handleAddGenre = async () => {
+    if (!newGenreName.trim()) return;
+    setGenreSaving(true);
+    try {
+      const res = await fetch("/api/admin/genres", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newGenreName.trim(), nameZh: newGenreNameZh.trim() || null }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      const g = await res.json();
+      setGenres(p => [...p, g]);
+      setShowAddGenre(false); setNewGenreName(""); setNewGenreNameZh("");
+      toast.success(locale === "zh" ? "分类已添加" : "Genre added");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : (locale === "zh" ? "添加失败" : "Failed"));
+    } finally { setGenreSaving(false); }
+  };
+
+  const handleSaveGenreEdit = async (id: string) => {
+    if (!editName.trim()) return;
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/genres/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName.trim(), nameZh: editNameZh.trim() || null }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      const updated = await res.json();
+      setGenres(p => p.map(g => g.id === id ? { ...g, ...updated } : g));
+      setEditingGenreId(null);
+      toast.success(locale === "zh" ? "分类已更新" : "Genre updated");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : (locale === "zh" ? "更新失败" : "Failed"));
+    } finally { setActionLoading(null); }
+  };
+
+  /* ── Inline book genre update ── */
+  const handleUpdateBookGenre = async (bookId: string, genre: string) => {
+    setBookGenreMap(m => ({ ...m, [bookId]: genre }));
+    setBooks(p => p.map(b => b.id === bookId ? { ...b, genre: genre || null } : b));
+    try {
+      await fetch(`/api/admin/books/${bookId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ genre }),
+      });
+      toast.success(locale === "zh" ? "分类已更新" : "Genre updated");
+    } catch {
+      toast.error(locale === "zh" ? "更新失败" : "Failed");
+    } finally {
+      setBookGenreMap(m => { const n = { ...m }; delete n[bookId]; return n; });
+    }
+  };
+
   /* ── Filter ── */
   const q = query.toLowerCase();
   const filteredUsers = users.filter(u =>
@@ -177,15 +268,19 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
     b.author.toLowerCase().includes(q));
   const filteredPosts = posts.filter(p =>
     p.content.toLowerCase().includes(q) || p.user.name.toLowerCase().includes(q));
+  const filteredGenres = genres.filter(g =>
+    g.name.toLowerCase().includes(q) || (g.nameZh ?? "").toLowerCase().includes(q));
 
   /* ── Tabs config ── */
   const tabs = [
-    { key: "users" as const, label: locale === "zh" ? "用户" : "Users",
+    { key: "users"  as const, label: locale === "zh" ? "用户" : "Users",
       icon: <FiUsers />, count: users.length },
-    { key: "books" as const, label: locale === "zh" ? "书籍" : "Books",
+    { key: "books"  as const, label: locale === "zh" ? "书籍" : "Books",
       icon: <FiBook />, count: books.length },
-    { key: "posts" as const, label: locale === "zh" ? "帖子" : "Posts",
+    { key: "posts"  as const, label: locale === "zh" ? "帖子" : "Posts",
       icon: <FiMessageSquare />, count: posts.length },
+    { key: "genres" as const, label: locale === "zh" ? "分类" : "Genres",
+      icon: <FiTag />, count: genres.length },
   ];
 
   return (
@@ -311,7 +406,7 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
             <div className="bg-white rounded-2xl border border-cream-200 overflow-hidden shadow-card">
               <TableHeader cols={[
                 locale === "zh" ? "书名" : "Title",
-                locale === "zh" ? "分类" : "Genre",
+                locale === "zh" ? "分类（可修改）" : "Genre (editable)",
                 locale === "zh" ? "数据" : "Stats",
                 locale === "zh" ? "推荐" : "Featured",
                 locale === "zh" ? "删除" : "Delete",
@@ -322,9 +417,10 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                     <motion.div key={book.id}
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.02 }}
-                      className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-5 py-4 hover:bg-cream-50 transition-colors ${book.isFeatured ? "bg-amber-50/60" : ""}`}>
+                      className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-center px-5 py-3.5 hover:bg-cream-50 transition-colors ${book.isFeatured ? "bg-amber-50/60" : ""}`}>
+                      {/* Title */}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold text-forest-900 text-sm truncate">
                             {locale === "zh" ? (book.titleZh || book.title) : book.title}
                           </p>
@@ -339,22 +435,36 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                         )}
                         <p className="text-xs text-gray-400">{book.author}{book.publishYear ? ` · ${book.publishYear}` : ""}</p>
                       </div>
-                      <div className="w-24 text-right">
-                        {book.genre && (
-                          <span className="text-[11px] bg-forest-50 text-forest-700 px-2 py-0.5 rounded-full font-medium">
-                            {book.genre}
-                          </span>
-                        )}
+
+                      {/* Genre dropdown (inline edit) */}
+                      <div className="w-36">
+                        <select
+                          value={bookGenreMap[book.id] ?? (book.genre || "")}
+                          onChange={e => handleUpdateBookGenre(book.id, e.target.value)}
+                          disabled={!!actionLoading}
+                          className="w-full text-[11px] border border-cream-200 rounded-lg px-2 py-1.5 bg-white text-forest-700 focus:outline-none focus:ring-1 focus:ring-forest-300 appearance-none cursor-pointer hover:border-forest-300 transition-colors"
+                        >
+                          <option value="">{locale === "zh" ? "无分类" : "No genre"}</option>
+                          {genres.map(g => (
+                            <option key={g.id} value={g.name}>
+                              {locale === "zh" ? (g.nameZh || g.name) : g.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      <div className="flex gap-3 text-xs text-gray-400 w-16 justify-center">
+
+                      {/* Stats */}
+                      <div className="flex gap-3 text-xs text-gray-400 w-14 justify-center">
                         <span className="flex items-center gap-0.5"><FiUsers className="text-[9px]" />{book._count.userBooks}</span>
                         <span className="flex items-center gap-0.5"><FiMessageSquare className="text-[9px]" />{book._count.posts}</span>
                       </div>
+
+                      {/* Featured toggle */}
                       <div className="flex justify-center w-10">
                         <IconBtn loading={actionLoading === book.id}
                           title={book.isFeatured
-                            ? (locale === "zh" ? "取消推荐" : "Remove from featured")
-                            : (locale === "zh" ? "设为推荐" : "Mark as featured")}
+                            ? (locale === "zh" ? "取消推荐" : "Remove featured")
+                            : (locale === "zh" ? "设为推荐" : "Mark featured")}
                           onClick={() => toggleFeatured(book)}
                           className={book.isFeatured
                             ? "text-amber-500 hover:bg-amber-50"
@@ -362,6 +472,8 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                           <FiStar className={book.isFeatured ? "fill-amber-400" : ""} />
                         </IconBtn>
                       </div>
+
+                      {/* Delete */}
                       <div className="flex justify-center w-10">
                         <IconBtn loading={actionLoading === book.id}
                           title={locale === "zh" ? "删除书籍" : "Delete book"}
@@ -435,6 +547,133 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
         )}
       </div>
 
+        {/* ── GENRES TAB ── */}
+        {tab === "genres" && (
+          genresLoading ? <Spinner /> : (
+            <div className="space-y-4">
+              {/* Add genre form */}
+              {showAddGenre ? (
+                <div className="bg-white rounded-2xl border border-brand-200 p-5 shadow-card">
+                  <p className="text-sm font-semibold text-forest-900 mb-3">
+                    {locale === "zh" ? "添加新分类" : "Add New Genre"}
+                  </p>
+                  <div className="flex gap-3 flex-wrap">
+                    <input
+                      autoFocus
+                      value={newGenreName}
+                      onChange={e => setNewGenreName(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleAddGenre()}
+                      placeholder={locale === "zh" ? "英文名称 (必填)" : "English name (required)"}
+                      className="input flex-1 min-w-40 text-sm"
+                    />
+                    <input
+                      value={newGenreNameZh}
+                      onChange={e => setNewGenreNameZh(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleAddGenre()}
+                      placeholder={locale === "zh" ? "中文名称" : "Chinese name"}
+                      className="input flex-1 min-w-32 text-sm"
+                    />
+                    <button onClick={handleAddGenre} disabled={genreSaving || !newGenreName.trim()}
+                      className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
+                      {genreSaving
+                        ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        : <FiCheck />}
+                      {locale === "zh" ? "保存" : "Save"}
+                    </button>
+                    <button onClick={() => { setShowAddGenre(false); setNewGenreName(""); setNewGenreNameZh(""); }}
+                      className="px-4 py-2 border border-cream-200 text-gray-500 rounded-xl text-sm hover:bg-gray-50">
+                      <FiX />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setShowAddGenre(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-brand-50 hover:bg-brand-100 text-brand-600 border border-brand-200 rounded-xl text-sm font-semibold transition-colors">
+                  <FiPlus /> {locale === "zh" ? "添加分类" : "Add Genre"}
+                </button>
+              )}
+
+              {/* Genre list */}
+              <div className="bg-white rounded-2xl border border-cream-200 overflow-hidden shadow-card">
+                <TableHeader cols={[
+                  locale === "zh" ? "英文名称" : "English Name",
+                  locale === "zh" ? "中文名称" : "Chinese Name",
+                  locale === "zh" ? "书籍数" : "Books",
+                  locale === "zh" ? "操作" : "Actions",
+                ]} />
+                {filteredGenres.length === 0
+                  ? <Empty icon={<FiTag />} label={locale === "zh" ? "无分类" : "No genres"} />
+                  : (
+                    <div className="divide-y divide-cream-100">
+                      {filteredGenres.map((genre, i) => (
+                        <motion.div key={genre.id}
+                          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                          transition={{ delay: i * 0.02 }}
+                          className="grid grid-cols-[1fr_1fr_auto_auto] gap-4 items-center px-5 py-3.5 hover:bg-cream-50 transition-colors">
+
+                          {editingGenreId === genre.id ? (
+                            /* Edit row */
+                            <>
+                              <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                                onKeyDown={e => e.key === "Enter" && handleSaveGenreEdit(genre.id)}
+                                className="input text-sm py-1.5 px-3" />
+                              <input value={editNameZh} onChange={e => setEditNameZh(e.target.value)}
+                                onKeyDown={e => e.key === "Enter" && handleSaveGenreEdit(genre.id)}
+                                className="input text-sm py-1.5 px-3"
+                                placeholder={locale === "zh" ? "中文名称" : "Chinese name"} />
+                              <span className="text-xs text-gray-400 text-center">{genre.bookCount}</span>
+                              <div className="flex gap-1">
+                                <IconBtn loading={actionLoading === genre.id}
+                                  title={locale === "zh" ? "保存" : "Save"}
+                                  onClick={() => handleSaveGenreEdit(genre.id)}
+                                  className="text-brand-500 hover:bg-brand-50">
+                                  <FiCheck />
+                                </IconBtn>
+                                <IconBtn loading={false}
+                                  title={locale === "zh" ? "取消" : "Cancel"}
+                                  onClick={() => setEditingGenreId(null)}
+                                  className="text-gray-400 hover:bg-gray-100">
+                                  <FiX />
+                                </IconBtn>
+                              </div>
+                            </>
+                          ) : (
+                            /* Display row */
+                            <>
+                              <p className="font-medium text-forest-900 text-sm">{genre.name}</p>
+                              <p className="text-sm text-gray-500">{genre.nameZh || <span className="text-gray-300 italic text-xs">—</span>}</p>
+                              <span className="text-xs text-center px-2 py-0.5 bg-forest-50 text-forest-700 rounded-full font-medium w-12">
+                                {genre.bookCount}
+                              </span>
+                              <div className="flex gap-1">
+                                <IconBtn loading={actionLoading === genre.id}
+                                  title={locale === "zh" ? "编辑" : "Edit"}
+                                  onClick={() => {
+                                    setEditingGenreId(genre.id);
+                                    setEditName(genre.name);
+                                    setEditNameZh(genre.nameZh || "");
+                                  }}
+                                  className="text-gray-400 hover:text-forest-600 hover:bg-forest-50">
+                                  <FiEdit2 />
+                                </IconBtn>
+                                <IconBtn loading={actionLoading === genre.id}
+                                  title={locale === "zh" ? "删除" : "Delete"}
+                                  onClick={() => setDeleteTarget({ kind: "genre", item: genre })}
+                                  className="text-gray-300 hover:text-red-500 hover:bg-red-50">
+                                  <FiTrash2 />
+                                </IconBtn>
+                              </div>
+                            </>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+              </div>
+            </div>
+          )
+        )}
+
       {/* ── Delete Confirm Modal ── */}
       <AnimatePresence>
         {deleteTarget && (
@@ -448,14 +687,16 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                 <FiAlertTriangle className="text-2xl text-red-500" />
               </div>
               <h3 className="font-serif text-xl font-bold text-forest-900 mb-2">
-                {deleteTarget.kind === "user" && (locale === "zh" ? "确认删除用户？" : "Delete user?")}
-                {deleteTarget.kind === "book" && (locale === "zh" ? "确认删除书籍？" : "Delete book?")}
-                {deleteTarget.kind === "post" && (locale === "zh" ? "确认删除帖子？" : "Delete post?")}
+                {deleteTarget.kind === "user"  && (locale === "zh" ? "确认删除用户？" : "Delete user?")}
+                {deleteTarget.kind === "book"  && (locale === "zh" ? "确认删除书籍？" : "Delete book?")}
+                {deleteTarget.kind === "post"  && (locale === "zh" ? "确认删除帖子？" : "Delete post?")}
+                {deleteTarget.kind === "genre" && (locale === "zh" ? "确认删除分类？" : "Delete genre?")}
               </h3>
               <p className="text-sm font-semibold text-gray-700 mb-1">
-                {deleteTarget.kind === "user" && (deleteTarget.item as User).name}
-                {deleteTarget.kind === "book" && ((deleteTarget.item as AdminBook).titleZh || (deleteTarget.item as AdminBook).title)}
-                {deleteTarget.kind === "post" && `"${(deleteTarget.item as AdminPost).content.slice(0, 40)}…"`}
+                {deleteTarget.kind === "user"  && (deleteTarget.item as User).name}
+                {deleteTarget.kind === "book"  && ((deleteTarget.item as AdminBook).titleZh || (deleteTarget.item as AdminBook).title)}
+                {deleteTarget.kind === "post"  && `"${(deleteTarget.item as AdminPost).content.slice(0, 40)}…"`}
+                {deleteTarget.kind === "genre" && (deleteTarget.item as AdminGenre).name}
               </p>
               {/* Extra warning if admin is deleting themselves */}
               {deleteTarget.kind === "user" && (deleteTarget.item as User).id === currentUserId && (

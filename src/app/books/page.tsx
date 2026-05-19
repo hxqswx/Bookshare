@@ -26,23 +26,16 @@ async function getBooks(query: string, genre: string) {
       ],
     };
 
-    const [books, genres] = await Promise.all([
+    const [books, genreRecords] = await Promise.all([
       prisma.book.findMany({
         where,
         include: { _count: { select: { userBooks: true, posts: true } } },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ isFeatured: "desc" }, { createdAt: "desc" }],
       }),
-      prisma.book.findMany({
-        where: { genre: { not: null } },
-        select: { genre: true },
-        distinct: ["genre"],
-      }),
+      prisma.genre.findMany({ orderBy: { order: "asc" }, select: { id: true, name: true, nameZh: true } }),
     ]);
 
-    return {
-      books,
-      genres: genres.map((g) => g.genre!).filter(Boolean),
-    };
+    return { books, genres: genreRecords };
   } catch {
     return { books: [], genres: [] };
   }
