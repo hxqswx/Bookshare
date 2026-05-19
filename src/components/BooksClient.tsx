@@ -94,11 +94,14 @@ export function BooksClient({
   const handleFileUpload = async (file: File) => {
     setUploadState("uploading");
     setUploadFileName(file.name);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 min timeout
     try {
       const { upload } = await import("@vercel/blob/client");
       const blob = await upload(file.name, file, {
         access: "public",
         handleUploadUrl: "/api/upload",
+        abortSignal: controller.signal,
       });
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       const typeMap: Record<string, string> = { pdf: "pdf", epub: "epub", txt: "txt" };
@@ -106,7 +109,10 @@ export function BooksClient({
       setUploadState("done");
     } catch (err) {
       setUploadState("error");
-      toast.error(err instanceof Error ? err.message : (locale === "zh" ? "上传失败，请检查文件格式" : "Upload failed"));
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(msg || (locale === "zh" ? "上传失败，请重试" : "Upload failed, please retry"));
+    } finally {
+      clearTimeout(timer);
     }
   };
 

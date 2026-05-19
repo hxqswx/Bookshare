@@ -296,11 +296,14 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
     if (!editBook) return;
     setEditUploadState("uploading");
     setEditUploadName(file.name);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10 * 60 * 1000); // 10 min timeout
     try {
       const { upload } = await import("@vercel/blob/client");
       const blob = await upload(file.name, file, {
         access: "public",
         handleUploadUrl: "/api/upload",
+        abortSignal: controller.signal,
       });
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       const typeMap: Record<string, string> = { pdf: "pdf", epub: "epub", txt: "txt" };
@@ -308,7 +311,10 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
       setEditUploadState("done");
     } catch (err) {
       setEditUploadState("error");
-      toast.error(err instanceof Error ? err.message : (locale === "zh" ? "上传失败" : "Upload failed"));
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(msg || (locale === "zh" ? "上传失败，请重试" : "Upload failed, please retry"));
+    } finally {
+      clearTimeout(timer);
     }
   };
 

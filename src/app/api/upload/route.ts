@@ -17,18 +17,22 @@ const ALLOWED_MIME = [
   "text/plain",
   "text/plain; charset=utf-8",
   "text/plain;charset=utf-8",
-  "application/octet-stream", // some browsers send this for .txt
+  "application/octet-stream", // some browsers send .txt as octet-stream
 ];
 
 /**
  * POST /api/upload
  *
- * Implements the Vercel Blob client-upload handshake:
- *   Phase 1 – "generate-client-token": browser asks for a signed upload URL
- *   Phase 2 – "upload-complete":        browser confirms upload finished
+ * Vercel Blob client-upload handshake.
+ * Phase 1 – "generate-client-token": returns a signed token for the browser.
+ * Phase 2 – "blob.upload-completed": acknowledged but no server-side work needed.
  *
- * The actual file bytes travel directly browser → Blob storage, so there is
- * no server-side body-size limit.
+ * NOTE: onUploadCompleted is intentionally omitted.
+ * When it is present, handleUpload embeds a callbackUrl in the client token and
+ * Vercel's CDN must POST to that URL before the upload is considered complete.
+ * This makes uploads hang in local dev (localhost unreachable from Vercel) and
+ * can stall production uploads if the webhook is slow. Since we only need the
+ * blob URL (returned to the browser directly), no server-side callback is required.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const session = await getServerSession(authOptions);
@@ -41,7 +45,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const jsonResponse = await handleUpload({
       body,
-      request: request as never, // handleUpload expects a Request; NextRequest is compatible
+      request: request as never,
       onBeforeGenerateToken: async (pathname: string) => {
         const ext = (pathname.split(".").pop() ?? "").toLowerCase();
         if (!EXT_TO_TYPE[ext]) {
@@ -51,13 +55,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           allowedContentTypes: ALLOWED_MIME,
           maximumSizeInBytes: MAX_BYTES,
           addRandomSuffix: true,
+          // No callbackUrl → no webhook → upload completes immediately
         };
       },
-      onUploadCompleted: async ({ blob }) => {
-        // This webhook is called by Vercel infrastructure after upload.
-        // In local dev (localhost) it won't fire — that's expected and fine.
-        console.log("Book file uploaded:", blob.pathname, blob.url);
-      },
+      // onUploadCompleted deliberately omitted — see comment above
     });
 
     return NextResponse.json(jsonResponse);
