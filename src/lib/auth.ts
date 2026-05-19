@@ -28,6 +28,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   );
 }
 
+// Accounts created before email verification was introduced are auto-verified
+// on first login so existing users are never locked out.
+const VERIFICATION_LAUNCH = new Date("2026-05-19T00:00:00Z");
+
 // Email / Password
 providers.push(
   CredentialsProvider({
@@ -40,10 +44,34 @@ providers.push(
       if (!credentials?.email || !credentials?.password) return null;
       const user = await prisma.user.findUnique({
         where: { email: credentials.email.toLowerCase() },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+          password: true,
+          emailVerified: true,
+          createdAt: true,
+        },
       });
       if (!user || !user.password) return null;
       const ok = await bcrypt.compare(credentials.password, user.password);
       if (!ok) return null;
+
+      // Email verification gate
+      if (!user.emailVerified) {
+        if (user.createdAt < VERIFICATION_LAUNCH) {
+          // Legacy account — silently stamp emailVerified so they aren't locked out
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { emailVerified: new Date() },
+          }).catch(() => {});
+        } else {
+          // New account that hasn't verified yet
+          throw new Error("EmailNotVerified");
+        }
+      }
+
       return { id: user.id, email: user.email, name: user.name, image: user.image };
     },
   })

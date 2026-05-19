@@ -51,8 +51,8 @@ export default function RegisterPage() {
         setLoading(false);
         return;
       }
-      toast.success(locale === "zh" ? "注册成功！正在登录…" : "Account created! Signing in…");
-      await signIn("credentials", { email: form.email.toLowerCase(), password: form.password, callbackUrl: "/" });
+      // Registration successful — user must verify email before logging in
+      router.push(`/check-email?email=${encodeURIComponent(form.email.toLowerCase())}`);
     } catch {
       toast.error(locale === "zh" ? "网络错误，请重试" : "Network error, please try again");
       setLoading(false);

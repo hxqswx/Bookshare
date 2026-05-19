@@ -26,11 +26,21 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
   // Map NextAuth ?error= param to human-readable message
   useEffect(() => {
     const error = searchParams.get("error");
     if (!error) return;
+    if (error === "EmailNotVerified") {
+      setErrorMsg(
+        locale === "zh"
+          ? "邮箱尚未验证，请查收验证邮件后再登录"
+          : "Email not verified — please check your inbox and click the verification link."
+      );
+      return;
+    }
     const messages: Record<string, [string, string]> = {
       OAuthAccountNotLinked: [
         "该邮箱已用其他方式注册，请使用邮箱 + 密码登录",
@@ -51,6 +61,21 @@ function LoginPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleResendVerification = async () => {
+    if (!unverifiedEmail || resendState !== "idle") return;
+    setResendState("sending");
+    try {
+      await fetch("/api/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: unverifiedEmail }),
+      });
+      setResendState("sent");
+    } catch {
+      setResendState("idle");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -63,6 +88,14 @@ function LoginPageContent() {
     if (result?.ok) {
       router.push("/");
       router.refresh();
+    } else if (result?.error === "EmailNotVerified") {
+      setUnverifiedEmail(form.email.toLowerCase());
+      setErrorMsg(
+        locale === "zh"
+          ? "邮箱尚未验证，请查收验证邮件后再登录"
+          : "Email not verified — please check your inbox and click the verification link."
+      );
+      setLoading(false);
     } else {
       setErrorMsg(locale === "zh" ? "邮箱或密码错误，请重试" : "Incorrect email or password, please try again.");
       setLoading(false);
@@ -139,8 +172,23 @@ function LoginPageContent() {
                   className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3.5 mb-6"
                 >
                   <FiAlertCircle className="flex-shrink-0 mt-0.5 text-red-500 text-lg" />
-                  <p className="text-sm font-medium leading-snug flex-1">{errorMsg}</p>
-                  <button onClick={() => setErrorMsg(null)} className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors mt-0.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium leading-snug">{errorMsg}</p>
+                    {unverifiedEmail && (
+                      <button
+                        onClick={handleResendVerification}
+                        disabled={resendState !== "idle"}
+                        className="mt-1.5 text-xs font-semibold text-red-600 hover:text-red-800 underline underline-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {resendState === "sending"
+                          ? (locale === "zh" ? "发送中…" : "Sending…")
+                          : resendState === "sent"
+                          ? (locale === "zh" ? "✓ 验证邮件已重新发送" : "✓ Verification email sent")
+                          : (locale === "zh" ? "重新发送验证邮件" : "Resend verification email")}
+                      </button>
+                    )}
+                  </div>
+                  <button onClick={() => { setErrorMsg(null); setUnverifiedEmail(null); setResendState("idle"); }} className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors mt-0.5">
                     <FiX size={15} />
                   </button>
                 </motion.div>
