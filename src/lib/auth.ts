@@ -82,13 +82,15 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async createUser({ user }) {
-      // Ensure every OAuth user has a name
-      if (!user.name) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { name: user.email?.split("@")[0] ?? "Reader" },
-        });
-      }
+      // Ensure every OAuth user has a name — wrapped so it never breaks login
+      try {
+        if (!user.name) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { name: user.email?.split("@")[0] ?? "Reader" },
+          });
+        }
+      } catch { /* non-fatal */ }
     },
   },
 };

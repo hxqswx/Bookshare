@@ -27,22 +27,33 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Show error from NextAuth ?error= param (e.g. OAuthAccountNotLinked)
+  // Show error from NextAuth ?error= param
   useEffect(() => {
     const error = searchParams.get("error");
     if (!error) return;
     const messages: Record<string, [string, string]> = {
       OAuthAccountNotLinked: [
         "该邮箱已用其他方式注册，请使用邮箱+密码登录",
-        "This email is registered with a different method. Please sign in with email & password.",
+        "This email was registered differently. Please use email & password.",
       ],
-      Callback: ["登录失败，请重试", "Sign-in failed, please try again"],
+      OAuthCreateAccount: [
+        "创建账户失败，请检查数据库配置",
+        "Failed to create account — database may need migration.",
+      ],
+      Callback: [
+        "登录回调出错，请重试",
+        "Sign-in callback error, please try again",
+      ],
       OAuthSignin: ["Google 登录出错，请重试", "Google sign-in error, please try again"],
       OAuthCallback: ["Google 授权失败，请重试", "Google authorization failed, please try again"],
-      Default: ["登录出错，请重试", "Sign-in error, please try again"],
+      Configuration: [
+        "服务器配置错误，请联系管理员",
+        "Server configuration error — contact the admin.",
+      ],
+      AccessDenied: ["访问被拒绝", "Access denied"],
     };
-    const [zh, en] = messages[error] ?? messages.Default;
-    toast.error(locale === "zh" ? zh : en, { duration: 6000 });
+    const [zh, en] = messages[error] ?? [`登录出错 (${error})`, `Sign-in error (${error})`];
+    toast.error(locale === "zh" ? zh : en, { duration: 8000 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
