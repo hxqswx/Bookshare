@@ -301,51 +301,164 @@ function TxtReader({
 
 // ─── EPUB Reader ──────────────────────────────────────────────────────────────
 
+interface TocItem {
+  id?: string;
+  href: string;
+  label: string;
+  subitems?: TocItem[];
+}
+
 function EpubReader({
   url, theme, fontSize, locale, onTextExtracted,
 }: {
   url: string; theme: Theme; fontSize: number; locale: string;
   onTextExtracted: (text: string) => void;
 }) {
-  const [ReactReader, setReactReader] = useState<React.ComponentType<{
-    url: string;
-    title?: string;
-    location: string | number;
-    locationChanged: (l: string) => void;
-    readerStyles?: Record<string, unknown>;
-    getRendition?: (rendition: { hooks: { content: { register: (fn: (c: { document: Document }) => void) => void } } }) => void;
-  }> | null>(null);
-  const [location, setLocation] = useState<string | number>(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [EpubView, setEpubView] = useState<React.ComponentType<any> | null>(null);
+  const [location, setLocation]   = useState<string | number>(0);
+  const [toc, setToc]             = useState<TocItem[]>([]);
+  const [showToc, setShowToc]     = useState(false);
+  const [chapterLabel, setChapterLabel] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const renditionRef = useRef<any>(null);
   const tc = THEMES[theme];
 
   useEffect(() => {
     import("react-reader").then(mod => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setReactReader(() => mod.ReactReader as any);
+      setEpubView(() => (mod as any).EpubView);
     });
   }, []);
 
-  const epubStyles: Record<string, unknown> = {
-    readerArea: { background: theme === "dark" ? "#030712" : theme === "sepia" ? "#fffbeb" : "#ffffff" },
-    reader:     { color: theme === "dark" ? "#f3f4f6" : theme === "sepia" ? "#451a03" : "#1f2937", fontSize: `${fontSize}px` },
-  };
+  // Re-apply theme/font when they change
+  useEffect(() => {
+    if (!renditionRef.current) return;
+    renditionRef.current.themes.default({
+      body: {
+        color:      theme === "dark" ? "#f3f4f6" : theme === "sepia" ? "#451a03" : "#1f2937",
+        background: theme === "dark" ? "#030712" : theme === "sepia" ? "#fffbeb" : "#ffffff",
+        fontSize:   `${fontSize}px`,
+        lineHeight: "1.9",
+        padding:    "0 2rem",
+      },
+    });
+  }, [theme, fontSize]);
 
-  if (!ReactReader) return <Spinner tc={tc} locale={locale} />;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleGetRendition = useCallback((rendition: any) => {
+    renditionRef.current = rendition;
+    // Apply initial styles
+    rendition.themes.default({
+      body: {
+        color:      theme === "dark" ? "#f3f4f6" : theme === "sepia" ? "#451a03" : "#1f2937",
+        background: theme === "dark" ? "#030712" : theme === "sepia" ? "#fffbeb" : "#ffffff",
+        fontSize:   `${fontSize}px`,
+        lineHeight: "1.9",
+        padding:    "0 2rem",
+      },
+    });
+    // Extract text for TTS
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rendition.hooks.content.register((contents: any) => {
+      const bodyText = contents.document?.body?.innerText ?? "";
+      if (bodyText) onTextExtracted(bodyText.slice(0, 8000));
+    });
+    // Track chapter label from location changes
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rendition.on("locationChanged", (loc: any) => {
+      if (!loc?.start?.cfi) return;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const navigateTo = useCallback((href: string, label: string) => {
+    setLocation(href);
+    setChapterLabel(label.trim());
+    setShowToc(false);
+  }, []);
+
+  /** Flatten nested TOC for rendering */
+  const renderTocItems = (items: TocItem[], depth = 0): React.ReactNode =>
+    items.map((item) => (
+      <div key={item.href + item.label}>
+        <button
+          onClick={() => navigateTo(item.href, item.label)}
+          className={`w-full text-left py-2 px-3 text-sm rounded-lg transition-colors hover:bg-gray-100 active:bg-gray-200 ${
+            depth > 0 ? "pl-6 text-gray-500" : "text-gray-800 font-medium"
+          }`}
+          style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
+        >
+          {item.label.trim()}
+        </button>
+        {item.subitems && item.subitems.length > 0 && renderTocItems(item.subitems, depth + 1)}
+      </div>
+    ));
+
+  const bg = theme === "dark" ? "#030712" : theme === "sepia" ? "#fffbeb" : "#ffffff";
+
+  if (!EpubView) return <Spinner tc={tc} locale={locale} />;
 
   return (
-    <div style={{ height: "calc(100vh - 160px)", minHeight: "400px" }}>
-      <ReactReader
-        url={url}
-        location={location}
-        locationChanged={(l) => setLocation(l)}
-        readerStyles={epubStyles}
-        getRendition={(rendition) => {
-          rendition.hooks.content.register((contents) => {
-            const bodyText = contents.document.body?.innerText ?? "";
-            if (bodyText) onTextExtracted(bodyText.slice(0, 8000));
-          });
-        }}
-      />
+    <div className="relative" style={{ height: "calc(100vh - 160px)", minHeight: "400px" }}>
+
+      {/* TOC toggle button */}
+      <button
+        onClick={() => setShowToc(v => !v)}
+        title={locale === "zh" ? "目录" : "Table of Contents"}
+        className={`absolute top-2 left-2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm border transition-colors ${
+          showToc
+            ? "bg-forest-600 text-white border-forest-600"
+            : "bg-white/90 text-gray-700 border-gray-200 hover:bg-white"
+        }`}
+      >
+        <FiBookOpen size={13} />
+        <span>{chapterLabel || (locale === "zh" ? "目录" : "Contents")}</span>
+      </button>
+
+      {/* TOC drawer */}
+      {showToc && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 z-20 bg-black/20"
+            onClick={() => setShowToc(false)}
+          />
+          {/* Panel */}
+          <div className="absolute top-0 left-0 bottom-0 z-30 w-72 bg-white shadow-2xl overflow-y-auto flex flex-col">
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+              <span className="font-semibold text-gray-900 text-sm">
+                {locale === "zh" ? "目录" : "Contents"}
+              </span>
+              <button
+                onClick={() => setShowToc(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              >✕</button>
+            </div>
+            <div className="flex-1 px-2 py-2">
+              {toc.length > 0
+                ? renderTocItems(toc)
+                : <p className="text-center text-gray-400 text-sm py-8">
+                    {locale === "zh" ? "暂无目录" : "No contents"}
+                  </p>
+              }
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* EPUB viewer */}
+      <div style={{ position: "absolute", inset: 0, background: bg }}>
+        <EpubView
+          url={url}
+          location={location}
+          locationChanged={(loc: string) => setLocation(loc)}
+          tocChanged={(t: TocItem[]) => setToc(t)}
+          getRendition={handleGetRendition}
+          epubOptions={{ flow: "paginated", manager: "default" }}
+          loadingView={<Spinner tc={tc} locale={locale} />}
+        />
+      </div>
     </div>
   );
 }
