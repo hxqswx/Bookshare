@@ -19,6 +19,8 @@ type FeaturedBook = {
   _count: { userBooks: number; posts: number };
 };
 
+type ReaderPickBook = FeaturedBook & { statusCount: number };
+
 interface HomeData {
   stats: { bookCount: number; userCount: number; postCount: number; newUsersThisMonth: number };
   recentPosts: Array<{
@@ -29,6 +31,11 @@ interface HomeData {
   }>;
   pinnedBooks: FeaturedBook[];
   featuredBooks: FeaturedBook[];
+  readerPicks: {
+    topWantToRead: ReaderPickBook | null;
+    topReading:    ReaderPickBook | null;
+    topFinished:   ReaderPickBook | null;
+  };
   leaderboard: Array<{
     id: string; name: string; image: string | null;
     booksFinished: number; postCount: number;
@@ -242,6 +249,99 @@ export function HomeClient({ data }: { data: HomeData }) {
                           {locale === "zh" ? "查看详情" : "View Book"}
                           <FiArrowRight />
                         </div>
+                      </div>
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════ READER'S PICKS ══════════════ */}
+      {(data.readerPicks.topWantToRead || data.readerPicks.topReading || data.readerPicks.topFinished) && (
+        <section className="py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <SectionLabel>{locale === "zh" ? "读者推荐" : "Reader's Picks"}</SectionLabel>
+            <h2 className="heading text-4xl font-bold text-forest-900 mb-3">
+              {locale === "zh" ? "书友们最爱的书" : "Most Loved by Readers"}
+            </h2>
+            <p className="text-gray-400 text-sm mb-10">
+              {locale === "zh" ? "根据真实阅读数据，由书友投票产生" : "Based on real reading data from our community"}
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {[
+                { book: data.readerPicks.topWantToRead, status: "want_to_read",
+                  emoji: "📌", labelZh: "最多想读", labelEn: "Most Wishlisted",
+                  bg: "from-sky-50 to-sky-100/60", border: "border-sky-200",
+                  badge: "bg-sky-100 text-sky-700 border-sky-200",
+                  countColor: "text-sky-600" },
+                { book: data.readerPicks.topReading, status: "reading",
+                  emoji: "📖", labelZh: "最多在读", labelEn: "Most Reading Now",
+                  bg: "from-brand-50 to-brand-100/60", border: "border-brand-200",
+                  badge: "bg-brand-100 text-brand-700 border-brand-200",
+                  countColor: "text-brand-600" },
+                { book: data.readerPicks.topFinished, status: "finished",
+                  emoji: "✅", labelZh: "最多读完", labelEn: "Most Completed",
+                  bg: "from-forest-50 to-forest-100/60", border: "border-forest-200",
+                  badge: "bg-forest-100 text-forest-700 border-forest-200",
+                  countColor: "text-forest-600" },
+              ].map(({ book, emoji, labelZh, labelEn, bg, border, badge, countColor }, i) => {
+                if (!book) return null;
+                const title  = locale === "zh" ? (book.titleZh  || book.title)  : book.title;
+                const author = locale === "zh" ? (book.authorZh || book.author) : book.author;
+                return (
+                  <motion.div key={i}
+                    initial={{ opacity: 0, y: 24 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}>
+                    <Link href={`/books/${book.id}`}
+                      className={`group flex flex-col h-full bg-gradient-to-br ${bg} border ${border} rounded-3xl p-5 hover:shadow-card-hover transition-all hover:-translate-y-1`}>
+                      {/* Category label */}
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${badge}`}>
+                          {emoji} {locale === "zh" ? labelZh : labelEn}
+                        </span>
+                      </div>
+
+                      {/* Book card */}
+                      <div className="flex gap-4 flex-1">
+                        {/* Cover */}
+                        <div className="flex-shrink-0 w-20">
+                          <div className="relative aspect-[2/3] rounded-xl overflow-hidden book-shadow group-hover:-translate-y-1 transition-transform duration-300">
+                            <BookCover src={book.cover} alt={title} title={title} />
+                          </div>
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                          <div>
+                            <h3 className="font-serif font-bold text-forest-900 text-base leading-snug line-clamp-2 group-hover:text-brand-600 transition-colors mb-1">
+                              {title}
+                            </h3>
+                            <p className="text-xs text-gray-500 line-clamp-1">{author}</p>
+                            {book.genre && (
+                              <span className="inline-block mt-2 px-2 py-0.5 bg-white/60 text-gray-600 text-[10px] rounded-full font-medium">
+                                {book.genre}
+                              </span>
+                            )}
+                          </div>
+                          <div className={`mt-3 font-bold text-lg ${countColor}`}>
+                            {book.statusCount}
+                            <span className="text-xs font-normal text-gray-400 ml-1">
+                              {locale === "zh" ? "人" : " readers"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CTA */}
+                      <div className="flex items-center gap-1 mt-4 text-xs font-semibold text-gray-400 group-hover:text-brand-500 transition-colors">
+                        {locale === "zh" ? "查看详情" : "View Book"}
+                        <FiArrowRight className="text-[11px] group-hover:translate-x-0.5 transition-transform" />
                       </div>
                     </Link>
                   </motion.div>

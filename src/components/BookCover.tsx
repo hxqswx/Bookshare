@@ -25,7 +25,11 @@ export function BookCover({ src, alt, title, fill = true, className = "object-co
       fill={fill}
       className={className}
       onError={() => setImgSrc(null)}
-      unoptimized={imgSrc.startsWith("https://covers.openlibrary.org") || imgSrc.startsWith("https://api.dicebear.com")}
+      unoptimized={
+        imgSrc.startsWith("https://covers.openlibrary.org") ||
+        imgSrc.startsWith("https://api.dicebear.com") ||
+        imgSrc.startsWith("https://img") // Douban CDN
+      }
     />
   );
 }

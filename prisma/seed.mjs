@@ -97,14 +97,14 @@ async function main() {
 
     prisma.book.upsert({
       where: { id: "book7" },
-      update: {},
+      update: { cover: "/covers/pingfan-de-shijie.jpg" },
       create: {
         id: "book7",
         title: "Ordinary World",
         titleZh: "平凡的世界",
         author: "Lu Yao",
         authorZh: "路遥",
-        cover: "https://covers.openlibrary.org/b/isbn/9787530216262-L.jpg",
+        cover: "/covers/pingfan-de-shijie.jpg",
         description:
           "A sweeping portrait of rural China from 1975–1985, following two brothers' struggle to rise above poverty.",
         descriptionZh:
@@ -154,14 +154,14 @@ async function main() {
 
     prisma.book.upsert({
       where: { id: "book10" },
-      update: {},
+      update: { cover: "/covers/mingchao-naxie-shier.jpg" },
       create: {
         id: "book10",
         title: "Ming Dynasty: The Untold Story",
         titleZh: "明朝那些事儿",
         author: "Dangninanmei",
         authorZh: "当年明月",
-        cover: "https://covers.openlibrary.org/b/isbn/9787802033993-L.jpg",
+        cover: "/covers/mingchao-naxie-shier.jpg",
         description:
           "A massively popular narrative history of the Ming Dynasty told with humor and vivid storytelling.",
         descriptionZh:
