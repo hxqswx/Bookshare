@@ -16,6 +16,7 @@ model User {
   avatar        String?
   bio           String?
   readingGoal   Int       @default(12)
+  isAdmin       Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

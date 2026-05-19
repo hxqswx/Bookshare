@@ -42,41 +42,43 @@ body {
   background-clip: text;
 }
 
-/* ── Cards ─────────────────────────────────────────────── */
-.card {
-  @apply bg-white rounded-2xl shadow-card border border-cream-200 transition-all duration-300;
-}
-.card:hover { @apply shadow-card-hover -translate-y-0.5; }
+@layer components {
+  /* ── Cards ─────────────────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-2xl shadow-card border border-cream-200 transition-all duration-300;
+  }
+  .card:hover { @apply shadow-card-hover -translate-y-0.5; }
 
-/* ── Buttons ────────────────────────────────────────────── */
-.btn-brand {
-  @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-white
-         bg-brand-gradient shadow-brand transition-all duration-200
-         hover:shadow-lg hover:scale-[1.03] active:scale-[0.98];
-}
-.btn-outline {
-  @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold
-         border-2 border-brand-400 text-brand-600
-         hover:bg-brand-50 transition-all duration-200;
-}
-.btn-ghost {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium
-         text-gray-600 hover:bg-cream-100 hover:text-forest-600 transition-all duration-200;
-}
+  /* ── Buttons ────────────────────────────────────────────── */
+  .btn-brand {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-white
+           bg-brand-gradient shadow-brand transition-all duration-200
+           hover:shadow-lg hover:scale-[1.03] active:scale-[0.98];
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold
+           border-2 border-brand-400 text-brand-600
+           hover:bg-brand-50 transition-all duration-200;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium
+           text-gray-600 hover:bg-cream-100 hover:text-forest-600 transition-all duration-200;
+  }
 
-/* ── SSO buttons ────────────────────────────────────────── */
-.btn-sso {
-  @apply w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl font-medium
-         border border-[#EDE4D8] bg-white text-gray-700
-         hover:bg-cream-100 hover:border-brand-300 transition-all duration-200 shadow-sm;
-}
+  /* ── SSO buttons ────────────────────────────────────────── */
+  .btn-sso {
+    @apply w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-xl font-medium
+           border border-[#EDE4D8] bg-white text-gray-700
+           hover:bg-cream-100 hover:border-brand-300 transition-all duration-200 shadow-sm;
+  }
 
-/* ── Form inputs ────────────────────────────────────────── */
-.input {
-  @apply w-full px-4 py-3 rounded-xl border border-[#EDE4D8] bg-white text-gray-800
-         placeholder-gray-400 text-sm
-         focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
-         transition-all duration-200;
+  /* ── Form inputs ────────────────────────────────────────── */
+  .input {
+    @apply w-full py-3 pr-4 pl-4 rounded-xl border border-[#EDE4D8] bg-white text-gray-800
+           placeholder-gray-400 text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent
+           transition-all duration-200;
+  }
 }
 
 /* ── Book card ──────────────────────────────────────────── */
