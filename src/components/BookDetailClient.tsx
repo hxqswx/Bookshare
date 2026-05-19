@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FiArrowLeft, FiUsers, FiStar, FiHeart,
   FiMessageSquare, FiShare2, FiCheck, FiX, FiCopy, FiTwitter,
+  FiBookOpen,
 } from "react-icons/fi";
 import { SiWhatsapp, SiX, SiFacebook, SiWechat, SiTiktok } from "react-icons/si";
 import { formatDistanceToNow } from "@/lib/utils";
@@ -26,6 +27,9 @@ interface Book {
   descriptionZh: string | null;
   genre: string | null;
   publishYear: number | null;
+  fileUrl: string | null;
+  fileType: string | null;
+  readLink: string | null;
   posts: Array<{
     id: string;
     content: string;
@@ -476,6 +480,23 @@ export function BookDetailClient({ book }: { book: Book }) {
                 ))}
               </div>
             </div>
+
+            {/* Read button */}
+            {(book.fileUrl || book.readLink) && (
+              <div className="mt-5">
+                <Link
+                  href={book.fileUrl ? `/books/${book.id}/read` : book.readLink!}
+                  target={book.readLink && !book.fileUrl ? "_blank" : undefined}
+                  rel={book.readLink && !book.fileUrl ? "noopener noreferrer" : undefined}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-forest-600 hover:bg-forest-700 text-white rounded-xl text-sm font-semibold transition-all hover:shadow-lg"
+                >
+                  <FiBookOpen />
+                  {locale === "zh"
+                    ? (book.fileUrl ? "开始阅读" : book.readLink?.includes("amazon") ? "Kindle 阅读" : "在线阅读")
+                    : (book.fileUrl ? "Read Now" : book.readLink?.includes("amazon") ? "Read on Kindle" : "Read Online")}
+                </Link>
+              </div>
+            )}
 
             {/* Share section */}
             <div className="mt-5 space-y-3">

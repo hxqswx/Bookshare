@@ -6,7 +6,10 @@ import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiSearch, FiBook, FiUsers, FiMessageSquare, FiPlus, FiX, FiGrid, FiList } from "react-icons/fi";
+import {
+  FiSearch, FiBook, FiUsers, FiMessageSquare, FiPlus, FiX, FiGrid, FiList,
+  FiUploadCloud, FiLink, FiCheck, FiAlertCircle,
+} from "react-icons/fi";
 import toast from "react-hot-toast";
 import { BookCover } from "@/components/BookCover";
 
@@ -55,7 +58,11 @@ export function BooksClient({
   const [newBook, setNewBook] = useState({
     title: "", titleZh: "", author: "", authorZh: "",
     cover: "", description: "", genre: "", publishYear: "",
+    fileUrl: "", fileType: "", readLink: "",
   });
+  const [sourceTab, setSourceTab] = useState<"upload" | "link" | "kindle">("upload");
+  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "done" | "error">("idle");
+  const [uploadFileName, setUploadFileName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [genreOptions, setGenreOptions] = useState<GenreItem[]>(initialData.genres);
 
@@ -84,6 +91,23 @@ export function BooksClient({
     router.push(`/books?${params.toString()}`);
   };
 
+  const handleFileUpload = async (file: File) => {
+    setUploadState("uploading");
+    setUploadFileName(file.name);
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      setNewBook(b => ({ ...b, fileUrl: data.url, fileType: data.type }));
+      setUploadState("done");
+    } catch (err) {
+      setUploadState("error");
+      toast.error(err instanceof Error ? err.message : (locale === "zh" ? "上传失败" : "Upload failed"));
+    }
+  };
+
   const handleAddBook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session) {
@@ -92,18 +116,27 @@ export function BooksClient({
     }
     setSubmitting(true);
     try {
+      // Attach reading source based on active tab
+      const readLink = sourceTab === "link" || sourceTab === "kindle" ? newBook.readLink : "";
+
       const res = await fetch("/api/books", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...newBook,
           publishYear: newBook.publishYear ? parseInt(newBook.publishYear) : null,
+          fileUrl: newBook.fileUrl || null,
+          fileType: newBook.fileType || null,
+          readLink: readLink || null,
         }),
       });
       if (!res.ok) throw new Error();
       toast.success(locale === "zh" ? "书籍添加成功！" : "Book added successfully!");
       setShowAddModal(false);
-      setNewBook({ title: "", titleZh: "", author: "", authorZh: "", cover: "", description: "", genre: "", publishYear: "" });
+      setNewBook({ title: "", titleZh: "", author: "", authorZh: "", cover: "", description: "", genre: "", publishYear: "", fileUrl: "", fileType: "", readLink: "" });
+      setUploadState("idle");
+      setUploadFileName("");
+      setSourceTab("upload");
       router.refresh();
     } catch {
       toast.error(locale === "zh" ? "添加失败，请重试" : "Failed to add book");
@@ -482,6 +515,112 @@ export function BooksClient({
                     placeholder={locale === "zh" ? "简短介绍这本书…" : "Brief description of the book…"}
                     className="w-full px-4 py-3 border border-cream-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none text-sm text-gray-700 placeholder-gray-300 transition-shadow"
                   />
+                </div>
+
+                {/* ── Reading Source ── */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+                    {locale === "zh" ? "📖 阅读来源（可选）" : "📖 Reading Source (optional)"}
+                  </label>
+                  {/* Tab strip */}
+                  <div className="flex rounded-xl border border-cream-200 overflow-hidden mb-3">
+                    {([
+                      { key: "upload", labelZh: "上传文件", labelEn: "Upload", icon: <FiUploadCloud className="text-[13px]" /> },
+                      { key: "link",   labelZh: "外部链接", labelEn: "Link",   icon: <FiLink className="text-[13px]" /> },
+                      { key: "kindle", labelZh: "Kindle",   labelEn: "Kindle", icon: <span className="text-[11px] font-bold">K</span> },
+                    ] as const).map(({ key, labelZh, labelEn, icon }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSourceTab(key)}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold transition-colors ${
+                          sourceTab === key
+                            ? "bg-brand-500 text-white"
+                            : "text-gray-500 hover:bg-gray-50"
+                        }`}
+                      >
+                        {icon}
+                        {locale === "zh" ? labelZh : labelEn}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Upload tab */}
+                  {sourceTab === "upload" && (
+                    <div>
+                      <label
+                        htmlFor="book-file-upload"
+                        className={`flex flex-col items-center justify-center gap-2 px-4 py-6 border-2 border-dashed rounded-2xl cursor-pointer transition-colors ${
+                          uploadState === "done"
+                            ? "border-forest-400 bg-forest-50"
+                            : uploadState === "error"
+                            ? "border-red-300 bg-red-50"
+                            : "border-cream-200 bg-gray-50 hover:border-brand-300 hover:bg-brand-50/30"
+                        }`}
+                      >
+                        {uploadState === "uploading" && (
+                          <>
+                            <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                            <span className="text-xs text-gray-500">{locale === "zh" ? "上传中…" : "Uploading…"}</span>
+                          </>
+                        )}
+                        {uploadState === "done" && (
+                          <>
+                            <FiCheck className="text-2xl text-forest-500" />
+                            <span className="text-xs text-forest-700 font-medium">{uploadFileName}</span>
+                            <span className="text-[11px] text-gray-400">{locale === "zh" ? "上传成功" : "Uploaded successfully"}</span>
+                          </>
+                        )}
+                        {uploadState === "error" && (
+                          <>
+                            <FiAlertCircle className="text-2xl text-red-400" />
+                            <span className="text-xs text-red-600">{locale === "zh" ? "上传失败，点击重试" : "Upload failed, click to retry"}</span>
+                          </>
+                        )}
+                        {uploadState === "idle" && (
+                          <>
+                            <FiUploadCloud className="text-2xl text-gray-400" />
+                            <span className="text-xs font-medium text-gray-600">{locale === "zh" ? "点击上传 PDF / EPUB" : "Click to upload PDF / EPUB"}</span>
+                            <span className="text-[11px] text-gray-400">{locale === "zh" ? "最大 50 MB" : "Max 50 MB"}</span>
+                          </>
+                        )}
+                      </label>
+                      <input
+                        id="book-file-upload"
+                        type="file"
+                        accept=".pdf,.epub,application/pdf,application/epub+zip"
+                        className="hidden"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Link tab */}
+                  {sourceTab === "link" && (
+                    <ModalInput
+                      label={locale === "zh" ? "在线阅读链接" : "Online reading URL"}
+                      value={newBook.readLink}
+                      onChange={v => setNewBook(b => ({ ...b, readLink: v }))}
+                      placeholder="https://..."
+                    />
+                  )}
+
+                  {/* Kindle tab */}
+                  {sourceTab === "kindle" && (
+                    <div>
+                      <ModalInput
+                        label={locale === "zh" ? "Amazon Kindle 链接" : "Amazon Kindle URL"}
+                        value={newBook.readLink}
+                        onChange={v => setNewBook(b => ({ ...b, readLink: v }))}
+                        placeholder="https://www.amazon.co.uk/dp/..."
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1.5">
+                        {locale === "zh"
+                          ? "读者可通过此链接在 Kindle 购买或阅读"
+                          : "Readers can purchase or open this book in their Kindle app"}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 pt-1">

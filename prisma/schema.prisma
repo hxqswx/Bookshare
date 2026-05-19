@@ -76,6 +76,9 @@ model Book {
   isbn          String?
   publishYear   Int?
   isFeatured    Boolean  @default(false)
+  fileUrl       String?   // Vercel Blob URL to uploaded PDF / EPUB
+  fileType      String?   // "pdf" | "epub"
+  readLink      String?   // external reading URL (web link, Kindle store, etc.)
   createdAt     DateTime @default(now())
 
   posts     Post[]

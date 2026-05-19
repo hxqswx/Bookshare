@@ -51,6 +51,23 @@ export async function POST(
   return NextResponse.json(userBook);
 }
 
+/** PATCH /api/userbook/[bookId] — save reading progress (page number) */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { bookId: string } }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { progress } = await req.json();
+  await prisma.userBook.updateMany({
+    where: { userId: session.user.id, bookId: params.bookId },
+    data: { progress: Math.max(0, Math.floor(Number(progress))) },
+  });
+  return NextResponse.json({ ok: true });
+}
+
 /** DELETE /api/userbook/[bookId] — remove from reading list */
 export async function DELETE(
   _req: NextRequest,

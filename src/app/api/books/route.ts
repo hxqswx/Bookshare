@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { title, titleZh, author, authorZh, cover, description, descriptionZh, genre, publishYear } = body;
+    const { title, titleZh, author, authorZh, cover, description, descriptionZh, genre, publishYear, fileUrl, fileType, readLink } = body;
 
     if (!title?.trim() || !author?.trim()) {
       return NextResponse.json({ error: "Title and author are required" }, { status: 400 });
@@ -70,6 +70,9 @@ export async function POST(req: NextRequest) {
         descriptionZh: descriptionZh?.trim() || null,
         genre: genre?.trim() || null,
         publishYear: publishYear ? parseInt(String(publishYear)) : null,
+        fileUrl: fileUrl?.trim() || null,
+        fileType: fileType?.trim() || null,
+        readLink: readLink?.trim() || null,
       },
     });
     return NextResponse.json(book);
