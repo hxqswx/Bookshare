@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
@@ -10,6 +10,7 @@ import { Avatar } from "@/components/Navbar";
 import {
   FiArrowRight, FiMessageSquare, FiEdit2, FiX, FiCheck,
   FiHeart, FiBookOpen, FiChevronLeft, FiChevronRight, FiUser,
+  FiCamera, FiCalendar, FiTrendingUp, FiZap,
 } from "react-icons/fi";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -46,6 +47,12 @@ interface PostsData {
   pages: number;
 }
 
+interface ReadingLog {
+  date: string; // YYYY-MM-DD
+  pages: number;
+  note: string;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 const POST_TYPE_LABELS: Record<string, [string, string]> = {
@@ -69,6 +76,48 @@ function formatDate(iso: string, locale: string): string {
   });
 }
 
+/** UTC today as YYYY-MM-DD */
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Number of days in a given year/month (1-indexed) */
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+/** 0=Sun..6=Sat for day 1 of year/month */
+function firstWeekday(year: number, month: number): number {
+  return new Date(year, month - 1, 1).getDay();
+}
+
+/** Heat-map colour based on pages */
+function heatColor(pages: number | undefined): string {
+  if (!pages) return "bg-gray-100";
+  if (pages <= 10) return "bg-brand-100";
+  if (pages <= 25) return "bg-brand-300";
+  if (pages <= 50) return "bg-brand-500";
+  return "bg-forest-500";
+}
+
+/** Compute streak: consecutive days ending at today with any log */
+function calcStreak(logs: Map<string, number>): number {
+  const today = new Date();
+  let streak = 0;
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    // convert to local date string for comparison
+    const key = d.toISOString().slice(0, 10);
+    if (logs.has(key) && (logs.get(key) ?? 0) > 0) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 // ── Edit Profile Modal ───────────────────────────────────────────────
 
 function EditProfileModal({
@@ -83,13 +132,54 @@ function EditProfileModal({
   onSaved: (name: string, image: string | null) => void;
 }) {
   const { locale } = useLanguage();
-  const [name, setName]   = useState(initialName);
-  const [image, setImage] = useState(initialImage ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState("");
+  const [name, setName]       = useState(initialName);
+  const [image, setImage]     = useState(initialImage ?? "");
+  const [saving, setSaving]   = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError]     = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Preview avatar
   const previewImage = image.trim() || null;
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Basic client-side validation
+    if (file.size > 2 * 1024 * 1024) {
+      setError(locale === "zh" ? "图片不能超过 2MB" : "Image must be under 2 MB");
+      return;
+    }
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type.toLowerCase())) {
+      setError(locale === "zh" ? "仅支持 JPG、PNG、WebP、GIF" : "Only JPG, PNG, WebP, GIF are supported");
+      return;
+    }
+
+    setError("");
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload/avatar", { method: "POST", body: fd });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error ?? "Upload failed");
+      }
+      const { url } = await res.json() as { url: string };
+      setImage(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : (locale === "zh" ? "上传失败" : "Upload failed"));
+    } finally {
+      setUploading(false);
+      // Reset input so same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -108,7 +198,7 @@ function EditProfileModal({
         const d = await res.json();
         throw new Error(d.error ?? "Failed");
       }
-      const data = await res.json();
+      const data = await res.json() as { name: string; image: string | null };
       onSaved(data.name, data.image);
     } catch (err) {
       setError(err instanceof Error ? err.message : (locale === "zh" ? "保存失败" : "Save failed"));
@@ -142,14 +232,38 @@ function EditProfileModal({
           </button>
         </div>
 
-        {/* Avatar preview */}
-        <div className="flex justify-center mb-6">
-          <div className="relative">
+        {/* Clickable avatar */}
+        <div className="flex flex-col items-center mb-6 gap-2">
+          <button
+            type="button"
+            onClick={handleAvatarClick}
+            disabled={uploading}
+            className="relative group focus:outline-none"
+            title={locale === "zh" ? "点击更换头像" : "Click to change avatar"}
+          >
             <Avatar name={name} image={previewImage} size={80} />
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-brand-500 rounded-full flex items-center justify-center">
-              <FiUser size={12} className="text-white" />
+            {/* Overlay */}
+            <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 group-disabled:opacity-100 transition-opacity flex items-center justify-center">
+              {uploading ? (
+                <span className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+              ) : (
+                <FiCamera className="text-white" size={18} />
+              )}
             </div>
-          </div>
+          </button>
+          <p className="text-xs text-gray-400">
+            {uploading
+              ? (locale === "zh" ? "上传中…" : "Uploading…")
+              : (locale === "zh" ? "点击头像更换图片" : "Click avatar to upload")}
+          </p>
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </div>
 
         <div className="space-y-4">
@@ -167,10 +281,10 @@ function EditProfileModal({
             />
           </div>
 
-          {/* Avatar URL */}
+          {/* Avatar URL (secondary) */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">
-              {locale === "zh" ? "头像链接（可选）" : "Avatar URL (optional)"}
+              {locale === "zh" ? "或填写头像链接" : "Or paste avatar URL"}
             </label>
             <input
               type="url"
@@ -201,7 +315,7 @@ function EditProfileModal({
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || uploading}
               className="flex-1 btn-brand py-2.5 rounded-xl text-sm disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
             >
               {saving
@@ -211,6 +325,282 @@ function EditProfileModal({
           </div>
         </div>
       </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Reading Calendar Section ─────────────────────────────────────────
+
+function ReadingCalendarSection({ locale }: { locale: string }) {
+  const today = todayStr();
+  const [year, setYear]   = useState(() => new Date().getUTCFullYear());
+  const [month, setMonth] = useState(() => new Date().getUTCMonth() + 1);
+  const [logs, setLogs]   = useState<Map<string, ReadingLog>>(new Map());
+  const [loading, setLoading] = useState(true);
+
+  // Check-in form
+  const [inputPages, setInputPages] = useState("");
+  const [inputNote, setInputNote]   = useState("");
+  const [saving, setSaving]         = useState(false);
+  const [saveMsg, setSaveMsg]       = useState("");
+
+  const fetchLogs = useCallback(async (y: number, m: number) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/reading-log?year=${y}&month=${m}`);
+      const data = await res.json() as ReadingLog[];
+      const map = new Map<string, ReadingLog>();
+      for (const l of data) map.set(l.date, l);
+      setLogs(map);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchLogs(year, month); }, [fetchLogs, year, month]);
+
+  // Pre-fill today's log if it exists
+  useEffect(() => {
+    const existing = logs.get(today);
+    if (existing) {
+      setInputPages(String(existing.pages));
+      setInputNote(existing.note ?? "");
+    } else {
+      setInputPages("");
+      setInputNote("");
+    }
+  }, [logs, today]);
+
+  const prevMonth = () => {
+    if (month === 1) { setYear(y => y - 1); setMonth(12); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (month === 12) { setYear(y => y + 1); setMonth(1); }
+    else setMonth(m => m + 1);
+  };
+
+  const isCurrentMonth =
+    year === new Date().getUTCFullYear() && month === new Date().getUTCMonth() + 1;
+
+  const handleCheckin = async () => {
+    const pages = parseInt(inputPages, 10);
+    if (!Number.isInteger(pages) || pages < 1 || pages > 9999) {
+      setSaveMsg(locale === "zh" ? "请输入 1-9999 的数字" : "Enter a number between 1 and 9999");
+      return;
+    }
+    setSaving(true);
+    setSaveMsg("");
+    try {
+      const res = await fetch("/api/reading-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pages, note: inputNote.trim() || null, date: today }),
+      });
+      if (!res.ok) {
+        const d = await res.json() as { error?: string };
+        throw new Error(d.error ?? "Failed");
+      }
+      const log = await res.json() as ReadingLog;
+      setLogs(prev => new Map(prev).set(log.date, log));
+      setSaveMsg(locale === "zh" ? "✅ 已打卡！" : "✅ Logged!");
+      setTimeout(() => setSaveMsg(""), 3000);
+    } catch (err) {
+      setSaveMsg(err instanceof Error ? err.message : (locale === "zh" ? "保存失败" : "Save failed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Calendar grid
+  const totalDays = daysInMonth(year, month);
+  const startWd   = firstWeekday(year, month); // 0=Sun
+  const cells: (number | null)[] = [
+    ...Array<null>(startWd).fill(null),
+    ...Array.from({ length: totalDays }, (_, i) => i + 1),
+  ];
+  // Pad to multiple of 7
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const todayDate = new Date();
+  const todayDay  = todayDate.getUTCDate();
+
+  // Stats
+  const allLogs = Array.from(logs.values());
+  const monthlyPages = allLogs.reduce((s, l) => s + l.pages, 0);
+  const daysLogged   = allLogs.filter(l => l.pages > 0).length;
+
+  // Build a full map across all cached months for streak
+  const logsForStreak = new Map<string, number>();
+  Array.from(logs.entries()).forEach(([k, v]) => logsForStreak.set(k, v.pages));
+  const streak = calcStreak(logsForStreak);
+
+  const dayHeaders = locale === "zh"
+    ? ["日", "一", "二", "三", "四", "五", "六"]
+    : ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+  const monthLabel = new Date(year, month - 1, 1).toLocaleDateString(
+    locale === "zh" ? "zh-CN" : "en-US",
+    { year: "numeric", month: "long" }
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.35 }}
+      className="bg-white rounded-2xl border border-cream-200 shadow-sm overflow-hidden"
+    >
+      {/* Header */}
+      <div className="px-5 pt-5 pb-4 border-b border-cream-100">
+        <div className="flex items-center gap-2 mb-1">
+          <FiCalendar className="text-brand-500" size={16} />
+          <h3 className="font-serif text-base font-bold text-forest-900">
+            {locale === "zh" ? "每日打卡" : "Daily Reading Log"}
+          </h3>
+        </div>
+        <p className="text-xs text-gray-400">
+          {locale === "zh" ? "记录每天阅读的页数" : "Log how many pages you read each day"}
+        </p>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 divide-x divide-cream-100 border-b border-cream-100">
+        {[
+          { icon: "📄", label: locale === "zh" ? "本月页数" : "Pages this month", value: monthlyPages },
+          { icon: "📅", label: locale === "zh" ? "打卡天数" : "Days logged",       value: daysLogged },
+          { icon: "🔥", label: locale === "zh" ? "连续天数" : "Day streak",         value: streak },
+        ].map(({ icon, label, value }) => (
+          <div key={label} className="px-4 py-3 text-center">
+            <div className="text-lg mb-0.5">{icon}</div>
+            <div className="text-lg font-bold text-forest-800">{value}</div>
+            <div className="text-[10px] text-gray-400 leading-tight">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Today's check-in */}
+      {isCurrentMonth && (
+        <div className="px-5 py-4 bg-brand-50/40 border-b border-cream-100">
+          <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wide">
+            {locale === "zh" ? `今天读了多少页？(${today})` : `How many pages today? (${today})`}
+          </p>
+          <div className="flex gap-2 items-start">
+            <div className="flex-1 space-y-2">
+              <input
+                type="number"
+                min={1}
+                max={9999}
+                value={inputPages}
+                onChange={e => setInputPages(e.target.value)}
+                placeholder={locale === "zh" ? "页数" : "Pages"}
+                className="w-full px-3 py-2 border border-cream-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white transition-shadow"
+              />
+              <input
+                type="text"
+                value={inputNote}
+                onChange={e => setInputNote(e.target.value)}
+                placeholder={locale === "zh" ? "备注（选填）" : "Note (optional)"}
+                maxLength={200}
+                className="w-full px-3 py-2 border border-cream-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white transition-shadow"
+              />
+            </div>
+            <button
+              onClick={handleCheckin}
+              disabled={saving}
+              className="btn-brand px-4 py-2 text-sm rounded-xl disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100 flex-shrink-0 h-[38px]"
+            >
+              {saving
+                ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
+                : (locale === "zh" ? "打卡" : "Log")}
+            </button>
+          </div>
+          {saveMsg && (
+            <p className={`text-sm mt-2 font-medium ${saveMsg.startsWith("✅") ? "text-forest-600" : "text-red-500"}`}>
+              {saveMsg}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Calendar */}
+      <div className="px-5 py-4">
+        {/* Month nav */}
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={prevMonth}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <FiChevronLeft size={16} />
+          </button>
+          <span className="text-sm font-semibold text-forest-800">{monthLabel}</span>
+          <button
+            onClick={nextMonth}
+            disabled={isCurrentMonth}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <FiChevronRight size={16} />
+          </button>
+        </div>
+
+        {/* Day headers */}
+        <div className="grid grid-cols-7 mb-1">
+          {dayHeaders.map(d => (
+            <div key={d} className="text-center text-[10px] font-semibold text-gray-400 py-1">{d}</div>
+          ))}
+        </div>
+
+        {/* Day cells */}
+        {loading ? (
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <div key={i} className="aspect-square rounded-md bg-gray-100 animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((day, idx) => {
+              if (!day) return <div key={`e${idx}`} />;
+
+              const dateKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+              const log     = logs.get(dateKey);
+              const isToday = isCurrentMonth && day === todayDay;
+              const isFuture = isCurrentMonth && day > todayDay;
+              const color   = isFuture ? "bg-gray-50" : heatColor(log?.pages);
+
+              return (
+                <div
+                  key={day}
+                  title={log ? `${log.pages}${locale === "zh" ? "页" : " pages"}${log.note ? ` · ${log.note}` : ""}` : undefined}
+                  className={`
+                    aspect-square rounded-md flex items-center justify-center text-[10px] font-medium relative
+                    ${color}
+                    ${isToday ? "ring-2 ring-brand-500 ring-offset-1" : ""}
+                    ${isFuture ? "text-gray-300" : log ? "text-white" : "text-gray-400"}
+                    ${log && !isFuture ? "cursor-default" : ""}
+                  `}
+                >
+                  {day}
+                  {log && log.pages > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-forest-400 rounded-full border border-white" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Legend */}
+        <div className="flex items-center gap-2 mt-3 text-[10px] text-gray-400">
+          <span>{locale === "zh" ? "少" : "Less"}</span>
+          {["bg-gray-100", "bg-brand-100", "bg-brand-300", "bg-brand-500", "bg-forest-500"].map(c => (
+            <div key={c} className={`w-3 h-3 rounded-sm ${c}`} />
+          ))}
+          <span>{locale === "zh" ? "多" : "More"}</span>
+        </div>
+      </div>
     </motion.div>
   );
 }
@@ -323,22 +713,19 @@ export default function ProfilePage() {
     setPostsLoading(true);
     fetch(`/api/profile/posts?page=${postsPage}`)
       .then(r => r.json())
-      .then(data => { setPostsData(data); setPostsLoading(false); })
+      .then((data: PostsData) => { setPostsData(data); setPostsLoading(false); })
       .catch(() => setPostsLoading(false));
   }, [status, postsPage]);
 
   const handleProfileSaved = async (name: string, image: string | null) => {
     setShowEditModal(false);
-    // Tell NextAuth to re-fetch the JWT so navbar/session reflects new values
     await update();
-    // If user image/name changed in session, trigger re-render
     router.refresh();
-    void name; void image; // values already saved server-side
+    void name; void image;
   };
 
   const handlePageChange = (p: number) => {
     setPostsPage(p);
-    // Scroll to posts section smoothly
     setTimeout(() => postsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
@@ -373,7 +760,7 @@ export default function ProfilePage() {
       {/* ── Hero ── */}
       <div className="bg-gradient-to-br from-forest-700 via-forest-600 to-forest-500 pt-20 pb-16">
         <div className="max-w-3xl mx-auto px-4 text-center">
-          {/* Avatar */}
+          {/* Avatar with edit button */}
           <div className="relative inline-block mb-4">
             <Avatar name={session.user?.name} image={session.user?.image} size={88} />
             <button
@@ -467,9 +854,12 @@ export default function ProfilePage() {
           </motion.div>
         )}
 
+        {/* ── Daily Reading Calendar ── */}
+        <ReadingCalendarSection locale={locale} />
+
         {/* ── Onboarding (no activity yet) ── */}
         {!hasBooks && stats !== null && stats.postCount === 0 && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
             className="bg-white rounded-2xl border border-cream-200 p-8 text-center shadow-sm">
             <div className="text-5xl mb-4">🚀</div>
             <h2 className="font-serif text-xl font-bold text-forest-900 mb-2">
@@ -494,7 +884,7 @@ export default function ProfilePage() {
 
         {/* ── Quick links ── */}
         {(hasBooks || (stats && stats.postCount > 0)) && (
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
             className="grid grid-cols-2 gap-3">
             <Link href="/books" className="bg-white rounded-2xl border border-cream-200 p-4 flex items-center gap-3 hover:border-brand-200 group shadow-sm transition-all">
               <div className="w-9 h-9 bg-brand-50 rounded-xl flex items-center justify-center text-lg flex-shrink-0 group-hover:bg-brand-100 transition-colors">📚</div>

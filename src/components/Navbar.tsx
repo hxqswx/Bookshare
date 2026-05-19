@@ -185,6 +185,15 @@ function NavItem({ href, children }: { href: string; children: React.ReactNode }
   );
 }
 
+/** Private Vercel Blob URLs must go through the /api/file proxy */
+function resolveAvatarUrl(image: string | null | undefined): string | null {
+  if (!image) return null;
+  if (image.includes(".blob.vercel-storage.com")) {
+    return `/api/file?url=${encodeURIComponent(image)}`;
+  }
+  return image;
+}
+
 export function Avatar({
   name,
   image,
@@ -195,14 +204,15 @@ export function Avatar({
   size?: number;
 }) {
   const [imgError, setImgError] = useState(false);
+  const src = resolveAvatarUrl(image);
 
   // Reset error state when image URL changes
   useEffect(() => { setImgError(false); }, [image]);
 
-  if (image && !imgError) {
+  if (src && !imgError) {
     return (
       <img
-        src={image}
+        src={src}
         alt={name ?? "Avatar"}
         style={{ width: size, height: size }}
         className="rounded-full object-cover flex-shrink-0"

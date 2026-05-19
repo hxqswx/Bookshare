@@ -41,7 +41,7 @@ interface HomeData {
   };
   leaderboard: Array<{
     id: string; name: string; image: string | null;
-    booksFinished: number; postCount: number;
+    booksFinished: number; pagesThisMonth: number; postCount: number; score: number;
   }>;
 }
 
@@ -495,17 +495,23 @@ export function HomeClient({ data }: { data: HomeData }) {
                       transition={{ delay: i * 0.06 }}
                       className="flex items-center gap-3 px-5 py-3.5 hover:bg-cream-50 transition-colors"
                     >
-                      <span className="text-lg w-7 text-center">
+                      <span className="text-lg w-7 text-center flex-shrink-0">
                         {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : <span className="text-sm text-gray-400 font-semibold">{i + 1}</span>}
                       </span>
-                      <Avatar name={u.name} size={34} />
+                      <Avatar name={u.name} image={u.image} size={34} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800 truncate">{u.name}</p>
                         <p className="text-xs text-gray-400">
-                          {u.booksFinished} {locale === "zh" ? "本" : "books"} · {u.postCount} {locale === "zh" ? "条" : "posts"}
+                          📚 {u.booksFinished}{locale === "zh" ? "本" : " books"}
+                          {u.pagesThisMonth > 0 && (
+                            <> · 📄 {u.pagesThisMonth}{locale === "zh" ? "页" : " pages"}</>
+                          )}
                         </p>
                       </div>
-                      <FiTrendingUp className="text-brand-400 flex-shrink-0 text-sm" />
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs font-bold text-brand-600">{u.score}</p>
+                        <p className="text-[10px] text-gray-400">{locale === "zh" ? "积分" : "pts"}</p>
+                      </div>
                     </motion.div>
                   ))
                 )}

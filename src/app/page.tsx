@@ -5,9 +5,10 @@ export const revalidate = 60;
 
 async function getStats() {
   try {
+    // UTC first-day-of-month midnight — used for both newUsersThisMonth and reading-log leaderboard
     const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
 
     // Helper: top book by status, returns book + the count for that specific status
     const topByStatus = async (status: string) => {
@@ -61,21 +62,29 @@ async function getStats() {
       topByStatus("finished"),
     ]);
 
-    const leaderboard = await prisma.user.findMany({
-      take: 5,
+    const leaderboardRaw = await prisma.user.findMany({
+      take: 20, // fetch more, then sort + slice
       include: {
-        readingList: { where: { status: "finished" } },
+        readingList:  { where: { status: "finished" } },
+        readingLogs:  { where: { date: { gte: monthStart } }, select: { pages: true } },
         _count: { select: { posts: true } },
       },
     });
 
-    const sortedLeaderboard = leaderboard
-      .map((u) => ({
-        id: u.id, name: u.name, image: u.image,
-        booksFinished: u.readingList.length,
-        postCount: u._count.posts,
-      }))
-      .sort((a, b) => b.booksFinished - a.booksFinished);
+    const sortedLeaderboard = leaderboardRaw
+      .map((u) => {
+        const booksFinished  = u.readingList.length;
+        const pagesThisMonth = u.readingLogs.reduce((s, l) => s + l.pages, 0);
+        return {
+          id: u.id, name: u.name, image: u.image,
+          booksFinished,
+          pagesThisMonth,
+          postCount: u._count.posts,
+          score: booksFinished * 100 + pagesThisMonth,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
 
     return {
       stats: { bookCount, userCount, postCount, newUsersThisMonth },
