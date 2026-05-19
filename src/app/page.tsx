@@ -14,7 +14,7 @@ async function getStats() {
           take: 6,
           orderBy: { createdAt: "desc" },
           include: {
-            user: { select: { id: true, name: true, avatar: true } },
+            user: { select: { id: true, name: true, image: true } },
             book: { select: { id: true, title: true, titleZh: true, cover: true, author: true } },
             _count: { select: { likes: true, comments: true } },
           },
@@ -43,7 +43,7 @@ async function getStats() {
       .map((u) => ({
         id: u.id,
         name: u.name,
-        avatar: u.avatar,
+        image: u.image,
         booksFinished: u.readingList.length,
         postCount: u._count.posts,
       }))

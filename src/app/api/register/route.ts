@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: hashed,
-        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name.trim())}&backgroundType=gradientLinear`,
+        image: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name.trim())}&backgroundType=gradientLinear`,
       },
     });
 

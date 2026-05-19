@@ -22,7 +22,7 @@ interface Post {
   content: string;
   type: string;
   createdAt: string;
-  user: { id: string; name: string; avatar: string | null };
+  user: { id: string; name: string; image: string | null };
   book: { id: string; title: string; titleZh: string | null; cover: string | null; author: string } | null;
   _count: { likes: number; comments: number };
 }
@@ -34,7 +34,7 @@ interface Book {
   author: string;
 }
 
-/* Deterministic avatar colour from name */
+/* Deterministic image colour from name */
 const AVATAR_COLORS = [
   "from-brand-400 to-brand-600",
   "from-forest-400 to-forest-600",
@@ -43,7 +43,7 @@ const AVATAR_COLORS = [
   "from-rose-400 to-rose-600",
   "from-amber-400 to-amber-600",
 ];
-function avatarGradient(name: string) {
+function imageGradient(name: string) {
   const code = name.charCodeAt(0) || 0;
   return AVATAR_COLORS[code % AVATAR_COLORS.length];
 }
@@ -234,7 +234,7 @@ function SharePageContent() {
             <div className="p-5">
               {/* User + type selector */}
               <div className="flex items-start gap-3 mb-4">
-                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarGradient(session.user?.name || "U")} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${imageGradient(session.user?.name || "U")} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
                   {session.user?.name?.[0]?.toUpperCase() ?? "U"}
                 </div>
                 <div className="flex-1">
@@ -336,7 +336,7 @@ function SharePageContent() {
                 >
                   <div className="flex items-start gap-3">
                     {/* Avatar */}
-                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarGradient(post.user.name)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${imageGradient(post.user.name)} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
                       {post.user.name[0]?.toUpperCase()}
                     </div>
 

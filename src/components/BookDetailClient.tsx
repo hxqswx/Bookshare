@@ -23,7 +23,7 @@ interface Book {
     content: string;
     type: string;
     createdAt: Date | string;
-    user: { id: string; name: string; avatar: string | null };
+    user: { id: string; name: string; image: string | null };
     _count: { likes: number; comments: number };
   }>;
   userBooks: Array<{

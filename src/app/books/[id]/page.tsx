@@ -11,7 +11,7 @@ async function getBook(id: string) {
           orderBy: { createdAt: "desc" },
           take: 10,
           include: {
-            user: { select: { id: true, name: true, avatar: true } },
+            user: { select: { id: true, name: true, image: true } },
             _count: { select: { likes: true, comments: true } },
           },
         },

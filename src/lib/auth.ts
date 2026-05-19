@@ -44,7 +44,7 @@ providers.push(
       if (!user || !user.password) return null;
       const ok = await bcrypt.compare(credentials.password, user.password);
       if (!ok) return null;
-      return { id: user.id, email: user.email, name: user.name, image: user.avatar };
+      return { id: user.id, email: user.email, name: user.name, image: user.image };
     },
   })
 );

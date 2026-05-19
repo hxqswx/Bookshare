@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
-          user: { select: { id: true, name: true, avatar: true } },
+          user: { select: { id: true, name: true, image: true } },
           book: { select: { id: true, title: true, titleZh: true, cover: true, author: true } },
           _count: { select: { likes: true, comments: true } },
         },
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
       },
       include: {
-        user: { select: { id: true, name: true, avatar: true } },
+        user: { select: { id: true, name: true, image: true } },
         book: { select: { id: true, title: true, titleZh: true, cover: true, author: true } },
         _count: { select: { likes: true, comments: true } },
       },

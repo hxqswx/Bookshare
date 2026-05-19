@@ -15,7 +15,7 @@ interface HomeData {
   stats: { bookCount: number; userCount: number; postCount: number };
   recentPosts: Array<{
     id: string; content: string; type: string; createdAt: Date | string;
-    user: { id: string; name: string; avatar: string | null };
+    user: { id: string; name: string; image: string | null };
     book: { id: string; title: string; titleZh: string | null; cover: string | null; author: string } | null;
     _count: { likes: number; comments: number };
   }>;
@@ -26,7 +26,7 @@ interface HomeData {
     _count: { userBooks: number; posts: number };
   }>;
   leaderboard: Array<{
-    id: string; name: string; avatar: string | null;
+    id: string; name: string; image: string | null;
     booksFinished: number; postCount: number;
   }>;
 }
