@@ -39,3 +39,9 @@ next-env.d.ts
 # prisma
 prisma/*.db
 prisma/*.db-journal
+
+# next-pwa — generated service worker files (built at deploy time, not in source)
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map

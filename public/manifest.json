@@ -1,0 +1,45 @@
+{
+  "name": "我们真的爱读书",
+  "short_name": "爱读书",
+  "description": "双语读书分享社区 — 分享阅读感悟，追踪进度，共同进步。A bilingual book sharing community.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FFFDF9",
+  "theme_color": "#2d6a4f",
+  "lang": "zh-CN",
+  "categories": ["books", "education", "social"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "书单",
+      "short_name": "书单",
+      "description": "浏览所有书籍",
+      "url": "/books",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "分享",
+      "short_name": "分享",
+      "description": "分享读书感悟",
+      "url": "/share",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

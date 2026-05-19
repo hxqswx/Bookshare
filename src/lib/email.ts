@@ -5,7 +5,12 @@ export function isEmailConfigured(): boolean {
   return !!process.env.RESEND_API_KEY;
 }
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init so the module can be imported at build time without a key
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
 const FROM =
   process.env.RESEND_FROM ?? "我们真的爱读书 <noreply@wezhendeaishu.com>";
@@ -21,7 +26,7 @@ export async function sendVerificationEmail(
 ): Promise<void> {
   const url = `${APP_URL}/api/verify-email?token=${token}`;
 
-  const { error } = await resend.emails.send({
+  const { error } = await getResend().emails.send({
     from: FROM,
     to,
     subject: "请验证您的邮箱 / Verify your email",
