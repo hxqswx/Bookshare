@@ -11,12 +11,10 @@ export async function DELETE(
   if (!session?.user?.isAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (params.id === session.user.id) {
-    return NextResponse.json({ error: "Cannot delete yourself" }, { status: 400 });
-  }
 
   await prisma.user.delete({ where: { id: params.id } });
-  return NextResponse.json({ ok: true });
+  // Return isSelf so client can sign out if needed
+  return NextResponse.json({ ok: true, isSelf: params.id === session.user.id });
 }
 
 export async function PATCH(

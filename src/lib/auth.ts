@@ -56,12 +56,17 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        // Fetch isAdmin once at sign-in
-        const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
-          select: { isAdmin: true },
-        });
-        token.isAdmin = dbUser?.isAdmin ?? false;
+        // Fetch isAdmin once at sign-in — wrapped in try/catch so a
+        // missing column (schema not yet pushed) never breaks login.
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { isAdmin: true },
+          });
+          token.isAdmin = dbUser?.isAdmin ?? false;
+        } catch {
+          token.isAdmin = false;
+        }
       }
       return token;
     },
