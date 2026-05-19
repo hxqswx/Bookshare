@@ -17,10 +17,11 @@ export async function GET() {
       author: true,
       genre: true,
       publishYear: true,
+      isFeatured: true,
       createdAt: true,
       _count: { select: { userBooks: true, posts: true } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ isFeatured: "desc" }, { createdAt: "desc" }],
   });
 
   return NextResponse.json(books);

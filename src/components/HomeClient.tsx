@@ -11,6 +11,14 @@ import {
   FiHeart, FiTrendingUp, FiStar,
 } from "react-icons/fi";
 
+type FeaturedBook = {
+  id: string; title: string; titleZh: string | null;
+  author: string; authorZh: string | null;
+  cover: string | null; genre: string | null;
+  description?: string | null; descriptionZh?: string | null;
+  _count: { userBooks: number; posts: number };
+};
+
 interface HomeData {
   stats: { bookCount: number; userCount: number; postCount: number; newUsersThisMonth: number };
   recentPosts: Array<{
@@ -19,12 +27,8 @@ interface HomeData {
     book: { id: string; title: string; titleZh: string | null; cover: string | null; author: string } | null;
     _count: { likes: number; comments: number };
   }>;
-  featuredBooks: Array<{
-    id: string; title: string; titleZh: string | null;
-    author: string; authorZh: string | null;
-    cover: string | null; genre: string | null;
-    _count: { userBooks: number; posts: number };
-  }>;
+  pinnedBooks: FeaturedBook[];
+  featuredBooks: FeaturedBook[];
   leaderboard: Array<{
     id: string; name: string; image: string | null;
     booksFinished: number; postCount: number;
@@ -113,7 +117,7 @@ export function HomeClient({ data }: { data: HomeData }) {
 
           {/* ── Right visual ── */}
           <div className="relative hidden lg:block h-[520px]">
-            <HeroIllustration books={data.featuredBooks.slice(0, 3)} locale={locale} newUsersThisMonth={data.stats.newUsersThisMonth} />
+            <HeroIllustration books={[...data.pinnedBooks, ...data.featuredBooks].slice(0, 3)} locale={locale} newUsersThisMonth={data.stats.newUsersThisMonth} />
           </div>
         </div>
 
@@ -176,12 +180,84 @@ export function HomeClient({ data }: { data: HomeData }) {
         </div>
       </section>
 
+      {/* ══════════════ EDITOR'S PICKS ══════════════ */}
+      {data.pinnedBooks.length > 0 && (
+        <section className="py-16 bg-gradient-to-br from-forest-800 via-forest-700 to-forest-600">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-2 mb-8">
+              <span className="text-amber-400 text-xl">⭐</span>
+              <span className="text-sm font-semibold text-amber-300 tracking-widest uppercase">
+                {locale === "zh" ? "编辑推荐" : "Editor's Picks"}
+              </span>
+            </div>
+
+            <div className="space-y-5">
+              {data.pinnedBooks.map((book, i) => {
+                const title  = locale === "zh" ? (book.titleZh  || book.title)  : book.title;
+                const author = locale === "zh" ? (book.authorZh || book.author) : book.author;
+                const desc   = locale === "zh" ? (book.descriptionZh || book.description) : book.description;
+                return (
+                  <motion.div
+                    key={book.id}
+                    initial={{ opacity: 0, y: 24 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                  >
+                    <Link href={`/books/${book.id}`}
+                      className="group flex flex-col sm:flex-row gap-6 bg-white/10 hover:bg-white/15 border border-white/20 rounded-3xl p-6 transition-all hover:shadow-2xl hover:border-amber-400/40">
+                      {/* Cover */}
+                      <div className="flex-shrink-0 w-24 sm:w-28">
+                        <div className="relative aspect-[2/3] rounded-xl overflow-hidden book-shadow group-hover:-translate-y-1 transition-transform duration-300">
+                          <BookCover src={book.cover} alt={title} title={title} />
+                        </div>
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          {book.genre && (
+                            <span className="text-[11px] bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full font-medium">
+                              {book.genre}
+                            </span>
+                          )}
+                          <span className="text-[11px] bg-white/10 text-white/60 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                            <FiUsers className="text-[9px]" />
+                            {book._count.userBooks} {locale === "zh" ? "人在读" : "readers"}
+                          </span>
+                        </div>
+
+                        <h3 className="font-serif text-xl sm:text-2xl font-bold text-white mb-1 leading-snug group-hover:text-amber-200 transition-colors">
+                          {title}
+                        </h3>
+                        <p className="text-forest-300 text-sm mb-3">{author}</p>
+
+                        {desc && (
+                          <p className="text-white/60 text-sm leading-relaxed line-clamp-2 mb-4">
+                            {desc}
+                          </p>
+                        )}
+
+                        <div className="flex items-center gap-2 text-amber-300 font-semibold text-sm group-hover:gap-3 transition-all">
+                          {locale === "zh" ? "查看详情" : "View Book"}
+                          <FiArrowRight />
+                        </div>
+                      </div>
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ══════════════ FEATURED BOOKS ══════════════ */}
       <section className="py-24 bg-cream-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-12">
             <div>
-              <SectionLabel>{locale === "zh" ? "精选书库" : "Featured Library"}</SectionLabel>
+              <SectionLabel>{locale === "zh" ? "热门书库" : "Popular Books"}</SectionLabel>
               <h2 className="heading text-4xl font-bold text-forest-900">
                 {locale === "zh" ? "大家都在读" : "What People Are Reading"}
               </h2>

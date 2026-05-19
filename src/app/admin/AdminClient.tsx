@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   FiUsers, FiTrash2, FiShield, FiShieldOff,
   FiSearch, FiAlertTriangle, FiBook,
-  FiMessageSquare, FiHeart,
+  FiMessageSquare, FiHeart, FiStar,
 } from "react-icons/fi";
 import toast from "react-hot-toast";
 
@@ -20,6 +20,7 @@ interface User {
 interface AdminBook {
   id: string; title: string; titleZh: string | null;
   author: string; genre: string | null; publishYear: number | null;
+  isFeatured: boolean;
   createdAt: string;
   _count: { userBooks: number; posts: number };
 }
@@ -143,6 +144,25 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
       toast.success(user.isAdmin
         ? (locale === "zh" ? "已撤销管理员" : "Admin revoked")
         : (locale === "zh" ? "已设为管理员" : "Admin granted"));
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : (locale === "zh" ? "操作失败" : "Failed"));
+    } finally { setActionLoading(null); }
+  };
+
+  /* ── Toggle featured ── */
+  const toggleFeatured = async (book: AdminBook) => {
+    setActionLoading(book.id);
+    try {
+      const res = await fetch(`/api/admin/books/${book.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeatured: !book.isFeatured }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      setBooks(p => p.map(b => b.id === book.id ? { ...b, isFeatured: !b.isFeatured } : b));
+      toast.success(book.isFeatured
+        ? (locale === "zh" ? "已取消推荐" : "Removed from featured")
+        : (locale === "zh" ? "已设为推荐" : "Marked as featured"));
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : (locale === "zh" ? "操作失败" : "Failed"));
     } finally { setActionLoading(null); }
@@ -293,6 +313,7 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                 locale === "zh" ? "书名" : "Title",
                 locale === "zh" ? "分类" : "Genre",
                 locale === "zh" ? "数据" : "Stats",
+                locale === "zh" ? "推荐" : "Featured",
                 locale === "zh" ? "删除" : "Delete",
               ]} />
               {filteredBooks.length === 0 ? <Empty icon={<FiBook />} label={locale === "zh" ? "无书籍" : "No books"} /> : (
@@ -301,11 +322,18 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                     <motion.div key={book.id}
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.02 }}
-                      className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-4 hover:bg-cream-50 transition-colors">
+                      className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-5 py-4 hover:bg-cream-50 transition-colors ${book.isFeatured ? "bg-amber-50/60" : ""}`}>
                       <div className="min-w-0">
-                        <p className="font-semibold text-forest-900 text-sm truncate">
-                          {locale === "zh" ? (book.titleZh || book.title) : book.title}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-forest-900 text-sm truncate">
+                            {locale === "zh" ? (book.titleZh || book.title) : book.title}
+                          </p>
+                          {book.isFeatured && (
+                            <span className="flex-shrink-0 text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold">
+                              ⭐ {locale === "zh" ? "推荐" : "Featured"}
+                            </span>
+                          )}
+                        </div>
                         {locale === "zh" && book.titleZh && (
                           <p className="text-xs text-gray-400 truncate">{book.title}</p>
                         )}
@@ -321,6 +349,18 @@ export default function AdminClient({ currentUserId }: { currentUserId: string }
                       <div className="flex gap-3 text-xs text-gray-400 w-16 justify-center">
                         <span className="flex items-center gap-0.5"><FiUsers className="text-[9px]" />{book._count.userBooks}</span>
                         <span className="flex items-center gap-0.5"><FiMessageSquare className="text-[9px]" />{book._count.posts}</span>
+                      </div>
+                      <div className="flex justify-center w-10">
+                        <IconBtn loading={actionLoading === book.id}
+                          title={book.isFeatured
+                            ? (locale === "zh" ? "取消推荐" : "Remove from featured")
+                            : (locale === "zh" ? "设为推荐" : "Mark as featured")}
+                          onClick={() => toggleFeatured(book)}
+                          className={book.isFeatured
+                            ? "text-amber-500 hover:bg-amber-50"
+                            : "text-gray-300 hover:text-amber-400 hover:bg-amber-50"}>
+                          <FiStar className={book.isFeatured ? "fill-amber-400" : ""} />
+                        </IconBtn>
                       </div>
                       <div className="flex justify-center w-10">
                         <IconBtn loading={actionLoading === book.id}

@@ -9,7 +9,7 @@ async function getStats() {
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
 
-    const [bookCount, userCount, postCount, newUsersThisMonth, recentPosts, featuredBooks] =
+    const [bookCount, userCount, postCount, newUsersThisMonth, recentPosts, pinnedBooks, popularBooks] =
       await Promise.all([
         prisma.book.count(),
         prisma.user.count(),
@@ -24,9 +24,18 @@ async function getStats() {
             _count: { select: { likes: true, comments: true } },
           },
         }),
+        // Admin-curated featured books
+        prisma.book.findMany({
+          where: { isFeatured: true },
+          include: {
+            _count: { select: { userBooks: true, posts: true } },
+          },
+          orderBy: { createdAt: "desc" },
+        }),
+        // Popular books (most readers)
         prisma.book.findMany({
           take: 6,
-          orderBy: { createdAt: "desc" },
+          orderBy: { userBooks: { _count: "desc" } },
           include: {
             _count: { select: { userBooks: true, posts: true } },
           },
@@ -57,13 +66,15 @@ async function getStats() {
     return {
       stats: { bookCount, userCount, postCount, newUsersThisMonth },
       recentPosts,
-      featuredBooks,
+      pinnedBooks,
+      featuredBooks: popularBooks,
       leaderboard: sortedLeaderboard,
     };
   } catch {
     return {
       stats: { bookCount: 0, userCount: 0, postCount: 0, newUsersThisMonth: 0 },
       recentPosts: [],
+      pinnedBooks: [],
       featuredBooks: [],
       leaderboard: [],
     };

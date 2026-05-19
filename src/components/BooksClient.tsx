@@ -21,6 +21,7 @@ interface Book {
   descriptionZh: string | null;
   genre: string | null;
   publishYear: number | null;
+  isFeatured: boolean;
   _count: { userBooks: number; posts: number };
 }
 
@@ -262,6 +263,14 @@ export function BooksClient({
                       alt={book.titleZh || book.title}
                       title={book.titleZh || book.title}
                     />
+                    {/* Featured badge */}
+                    {book.isFeatured && (
+                      <div className="absolute top-2 right-2">
+                        <span className="px-1.5 py-0.5 bg-amber-400/90 text-white text-[10px] rounded-full backdrop-blur-sm font-bold shadow-sm">
+                          ⭐
+                        </span>
+                      </div>
+                    )}
                     {/* Genre badge */}
                     {book.genre && (
                       <div className="absolute top-2 left-2">
@@ -317,9 +326,16 @@ export function BooksClient({
                     <BookCover src={book.cover} alt={book.titleZh || book.title} title={book.titleZh || book.title} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-forest-900 text-sm group-hover:text-brand-600 transition-colors line-clamp-1">
-                      {locale === "zh" ? (book.titleZh || book.title) : book.title}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-forest-900 text-sm group-hover:text-brand-600 transition-colors line-clamp-1">
+                        {locale === "zh" ? (book.titleZh || book.title) : book.title}
+                      </h3>
+                      {book.isFeatured && (
+                        <span className="flex-shrink-0 text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold">
+                          ⭐ {locale === "zh" ? "推荐" : "Pick"}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {locale === "zh" ? (book.authorZh || book.author) : book.author}
                       {book.publishYear && ` · ${book.publishYear}`}

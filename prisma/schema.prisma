@@ -75,6 +75,7 @@ model Book {
   genre         String?
   isbn          String?
   publishYear   Int?
+  isFeatured    Boolean  @default(false)
   createdAt     DateTime @default(now())
 
   posts     Post[]

@@ -416,6 +416,27 @@ async function main() {
         publishYear: 2018,
       },
     }),
+
+    // ── Featured / Editor's Pick ─────────────────────────────────────────
+    prisma.book.upsert({
+      where: { id: "book21" },
+      update: { isFeatured: true },   // ensure it stays featured on re-seed
+      create: {
+        id: "book21",
+        title: "What Every Chinese Founder Should Know About The UK Business System",
+        titleZh: "每位中国创始人都应了解的英国商业体系",
+        author: "Various Contributors",
+        authorZh: "多位作者",
+        cover: null,
+        description:
+          "A practical guide for Chinese entrepreneurs navigating the UK business system — from company formation and banking to legal compliance, tax, and fundraising. Covers the key differences between UK and Chinese corporate culture that every founder needs to understand before launching or expanding in Britain.",
+        descriptionZh:
+          "专为中国创业者撰写的英国商业实战指南。涵盖公司注册、银行开户、法律合规、税务、融资等核心议题，深入剖析中英两国商业文化差异，帮助创始人避开常见陷阱、快速融入英国商业生态。",
+        genre: "Business",
+        publishYear: 2024,
+        isFeatured: true,
+      },
+    }),
   ]);
 
   console.log("✅ 20 books seeded successfully!");
