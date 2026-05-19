@@ -41,9 +41,13 @@ export const metadata: Metadata = {
   },
   // ── Icons ───────────────────────────────────────────────────────────
   icons: {
-    icon: "/icons/icon.svg",
-    shortcut: "/icons/icon.svg",
-    apple: "/icons/icon.svg",
+    icon: [
+      { url: "/api/icons/192", sizes: "192x192", type: "image/png" },
+      { url: "/api/icons/512", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/api/icons/192",
+    // iOS Safari requires a real PNG for the home-screen icon
+    apple: [{ url: "/api/icons/180", sizes: "180x180", type: "image/png" }],
     other: [
       { rel: "mask-icon", url: "/icons/icon.svg", color: "#2d6a4f" },
     ],
