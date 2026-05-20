@@ -1119,7 +1119,7 @@ function HeroIllustration({ books, locale, newUsersThisMonth }: { books: HomeDat
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 + delay, duration: 0.6 }}
-            className="absolute bg-white rounded-2xl shadow-card-hover p-4 w-52 cursor-pointer hover:shadow-2xl transition-shadow"
+            className="absolute bg-white rounded-2xl shadow-card-hover w-52 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
             style={{
               left: x, top: y,
               rotate,
@@ -1127,24 +1127,26 @@ function HeroIllustration({ books, locale, newUsersThisMonth }: { books: HomeDat
               animationDelay: `${i * 0.8}s`,
             }}
           >
-            <div className="flex gap-3 items-start">
-              <div className="relative w-12 h-16 rounded-lg overflow-hidden flex-shrink-0 book-shadow">
-                <BookCover src={book.cover} alt={book.title} title={book.title} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-gray-800 line-clamp-2 leading-snug">
-                  {locale === "zh" ? (book.titleZh || book.title) : book.title}
-                </p>
-                <p className="text-[11px] text-gray-400 mt-0.5 truncate">
-                  {locale === "zh" ? (book.authorZh || book.author) : book.author}
-                </p>
-                <div className="flex items-center gap-0.5 mt-1.5">
-                  {[...Array(5)].map((_, j) => (
-                    <FiStar key={j} className="text-amber-400 fill-amber-400 text-[10px]" />
-                  ))}
+            <Link href={`/books/${book.id}`} className="block p-4 rounded-2xl">
+              <div className="flex gap-3 items-start">
+                <div className="relative w-12 h-16 rounded-lg overflow-hidden flex-shrink-0 book-shadow">
+                  <BookCover src={book.cover} alt={book.title} title={book.title} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-800 line-clamp-2 leading-snug group-hover:text-brand-600">
+                    {locale === "zh" ? (book.titleZh || book.title) : book.title}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                    {locale === "zh" ? (book.authorZh || book.author) : book.author}
+                  </p>
+                  <div className="flex items-center gap-0.5 mt-1.5">
+                    {[...Array(5)].map((_, j) => (
+                      <FiStar key={j} className="text-amber-400 fill-amber-400 text-[10px]" />
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            </Link>
           </motion.div>
         );
       })}
