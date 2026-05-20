@@ -162,8 +162,10 @@ function PdfReader({
 
   useEffect(() => {
     import("react-pdf").then((mod) => {
-      mod.pdfjs.GlobalWorkerOptions.workerSrc =
-        `https://unpkg.com/pdfjs-dist@${mod.pdfjs.version}/build/pdf.worker.min.mjs`;
+      // pdfjs-dist v5 only ships ES-module workers (.mjs).
+      // We copy pdf.worker.min.mjs to /public at build time (see next.config.mjs)
+      // so it's served locally with the correct Content-Type and no CORS issues.
+      mod.pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
       setPdfModule({ Document: mod.Document as never, Page: mod.Page as never });
     });
   }, []);
@@ -321,7 +323,8 @@ function EpubReader({
   const [showToc, setShowToc]     = useState(false);
   const [chapterLabel, setChapterLabel] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renditionRef = useRef<any>(null);
+  const renditionRef   = useRef<any>(null);
+  const touchStartXRef = useRef<number | null>(null);
   const tc = THEMES[theme];
 
   useEffect(() => {
@@ -345,10 +348,22 @@ function EpubReader({
     });
   }, [theme, fontSize]);
 
+  // Keyboard navigation (arrow keys)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Don't intercept when typing in an input
+      if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") renditionRef.current?.next();
+      if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   renditionRef.current?.prev();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleGetRendition = useCallback((rendition: any) => {
     renditionRef.current = rendition;
-    // Apply initial styles
+    // Apply initial theme + font
     rendition.themes.default({
       body: {
         color:      theme === "dark" ? "#f3f4f6" : theme === "sepia" ? "#451a03" : "#1f2937",
@@ -358,16 +373,24 @@ function EpubReader({
         padding:    "0 2rem",
       },
     });
-    // Extract text for TTS
+    // Extract text for TTS + wire up swipe inside the iframe
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rendition.hooks.content.register((contents: any) => {
       const bodyText = contents.document?.body?.innerText ?? "";
       if (bodyText) onTextExtracted(bodyText.slice(0, 8000));
-    });
-    // Track chapter label from location changes
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rendition.on("locationChanged", (loc: any) => {
-      if (!loc?.start?.cfi) return;
+
+      // Touch-swipe navigation inside the epub iframe
+      let swipeStartX = 0;
+      contents.document.addEventListener("touchstart", (e: TouchEvent) => {
+        swipeStartX = e.touches[0].clientX;
+      }, { passive: true });
+      contents.document.addEventListener("touchend", (e: TouchEvent) => {
+        const dx = e.changedTouches[0].clientX - swipeStartX;
+        if (Math.abs(dx) > 40) {
+          if (dx > 0) renditionRef.current?.prev();
+          else        renditionRef.current?.next();
+        }
+      }, { passive: true });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -377,6 +400,20 @@ function EpubReader({
     setChapterLabel(label.trim());
     setShowToc(false);
   }, []);
+
+  /** Swipe on the outer container (outside the iframe) */
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartXRef.current;
+    if (Math.abs(dx) > 40) {
+      if (dx > 0) renditionRef.current?.prev();
+      else        renditionRef.current?.next();
+    }
+    touchStartXRef.current = null;
+  };
 
   /** Flatten nested TOC for rendering */
   const renderTocItems = (items: TocItem[], depth = 0): React.ReactNode =>
@@ -396,17 +433,41 @@ function EpubReader({
     ));
 
   const bg = theme === "dark" ? "#030712" : theme === "sepia" ? "#fffbeb" : "#ffffff";
+  const navBtnBase =
+    "absolute top-0 bottom-0 z-10 flex items-center justify-center w-14 transition-opacity select-none";
 
   if (!EpubView) return <Spinner tc={tc} locale={locale} />;
 
   return (
-    <div className="relative" style={{ height: "calc(100vh - 160px)", minHeight: "400px" }}>
+    <div
+      className="relative"
+      style={{ height: "calc(100vh - 160px)", minHeight: "400px" }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* ── Prev page button ── */}
+      <button
+        onClick={() => renditionRef.current?.prev()}
+        title={locale === "zh" ? "上一页 (←)" : "Previous page (←)"}
+        className={`${navBtnBase} left-0 opacity-0 hover:opacity-100 bg-gradient-to-r from-black/8 to-transparent`}
+      >
+        <FiChevronLeft size={28} className="text-gray-600 drop-shadow" />
+      </button>
 
-      {/* TOC toggle button */}
+      {/* ── Next page button ── */}
+      <button
+        onClick={() => renditionRef.current?.next()}
+        title={locale === "zh" ? "下一页 (→)" : "Next page (→)"}
+        className={`${navBtnBase} right-0 opacity-0 hover:opacity-100 bg-gradient-to-l from-black/8 to-transparent`}
+      >
+        <FiChevronRight size={28} className="text-gray-600 drop-shadow" />
+      </button>
+
+      {/* ── TOC toggle button ── */}
       <button
         onClick={() => setShowToc(v => !v)}
         title={locale === "zh" ? "目录" : "Table of Contents"}
-        className={`absolute top-2 left-2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm border transition-colors ${
+        className={`absolute top-2 left-16 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm border transition-colors ${
           showToc
             ? "bg-forest-600 text-white border-forest-600"
             : "bg-white/90 text-gray-700 border-gray-200 hover:bg-white"
@@ -416,7 +477,7 @@ function EpubReader({
         <span>{chapterLabel || (locale === "zh" ? "目录" : "Contents")}</span>
       </button>
 
-      {/* TOC drawer */}
+      {/* ── TOC drawer ── */}
       {showToc && (
         <>
           {/* Backdrop */}
@@ -447,7 +508,7 @@ function EpubReader({
         </>
       )}
 
-      {/* EPUB viewer */}
+      {/* ── EPUB viewer ── */}
       <div style={{ position: "absolute", inset: 0, background: bg }}>
         <EpubView
           url={url}
