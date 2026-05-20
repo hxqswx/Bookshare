@@ -11,6 +11,20 @@ import {
 } from "react-icons/fi";
 import { TtsPlayer } from "./TtsPlayer";
 
+// ─── Encoding-aware text decoder ─────────────────────────────────────────────
+// Chinese TXT files may be GBK/GB2312 (legacy) or UTF-8 (modern).
+// Strategy: try UTF-8 first; if it produces replacement chars (U+FFFD) fall
+// back to GBK which covers GB2312, GBK, and GB18030.
+function decodeBuffer(buffer: ArrayBuffer): string {
+  const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+  if (!utf8.includes("�")) return utf8;
+  try {
+    return new TextDecoder("gbk").decode(buffer);
+  } catch {
+    return utf8; // last resort — already decoded
+  }
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ReaderBook {
@@ -247,9 +261,11 @@ function TxtReader({
     fetch(url)
       .then(r => {
         if (!r.ok) throw new Error(`${r.status}`);
-        return r.text();
+        // Use arrayBuffer so we can detect & handle GBK/GB2312 encoded files
+        return r.arrayBuffer();
       })
-      .then(text => {
+      .then(buf => {
+        const text = decodeBuffer(buf);
         const ps = splitIntoPages(text);
         setPages(ps);
         onTotalPages(ps.length);

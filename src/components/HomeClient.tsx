@@ -730,7 +730,20 @@ function DailyCheckinWidget({ locale, session }: { locale: string; session: Sess
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pages, note: inputNote.trim() || null, date: todayStr }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        if (res.status === 404 && body.error === "USER_NOT_FOUND") {
+          // Session is stale — user account no longer exists; force re-login
+          setSaveMsg(
+            locale === "zh"
+              ? "账号已失效，请重新登录 →"
+              : "Session expired — please log in again →"
+          );
+          setTimeout(() => { window.location.href = "/login"; }, 2000);
+          return;
+        }
+        throw new Error(body.error ?? "error");
+      }
       const log = await res.json() as { date: string; pages: number };
       setLogs(prev => new Map(prev).set(log.date, log.pages));
       setSaveMsg(locale === "zh" ? "🎉 打卡成功！" : "🎉 Logged!");

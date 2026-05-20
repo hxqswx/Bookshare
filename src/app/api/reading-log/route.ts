@@ -59,19 +59,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Pages must be between 1 and 9999" }, { status: 400 });
   }
 
-  const dateKey = dateStr || todayUTC();
-  const dateObj = parseDate(dateKey);
-
-  const log = await prisma.readingLog.upsert({
-    where:  { userId_date: { userId: session.user.id, date: dateObj } },
-    create: { userId: session.user.id, date: dateObj, pages: pagesNum, note: note?.trim() || null },
-    update: { pages: pagesNum, note: note?.trim() || null },
-    select: { date: true, pages: true, note: true },
+  // Guard: ensure the user record still exists (catches stale JWT after DB reset)
+  const userExists = await prisma.user.findUnique({
+    where:  { id: session.user.id },
+    select: { id: true },
   });
+  if (!userExists) {
+    return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+  }
 
-  return NextResponse.json({
-    date:  log.date.toISOString().slice(0, 10),
-    pages: log.pages,
-    note:  log.note ?? "",
-  });
+  try {
+    const dateKey = dateStr || todayUTC();
+    const dateObj = parseDate(dateKey);
+
+    const log = await prisma.readingLog.upsert({
+      where:  { userId_date: { userId: session.user.id, date: dateObj } },
+      create: { userId: session.user.id, date: dateObj, pages: pagesNum, note: note?.trim() || null },
+      update: { pages: pagesNum, note: note?.trim() || null },
+      select: { date: true, pages: true, note: true },
+    });
+
+    return NextResponse.json({
+      date:  log.date.toISOString().slice(0, 10),
+      pages: log.pages,
+      note:  log.note ?? "",
+    });
+  } catch (err) {
+    console.error("[reading-log POST]", err);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
 }
