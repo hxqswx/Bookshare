@@ -8,25 +8,24 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   name          String
-  email         String    @unique
+  email         String       @unique
   emailVerified DateTime?
-  password      String?   // nullable — OAuth users have no password
-  image         String?
+  password      String?
   bio           String?
-  readingGoal   Int       @default(12)
-  isAdmin       Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  accounts     Account[]
-  sessions     Session[]
-  posts        Post[]
-  comments     Comment[]
-  likes        Like[]
-  readingList  UserBook[]
-  readingLogs  ReadingLog[]
+  readingGoal   Int          @default(12)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  isAdmin       Boolean      @default(false)
+  image         String?
+  accounts      Account[]
+  comments      Comment[]
+  likes         Like[]
+  posts         Post[]
+  readingLogs   ReadingLog[]
+  sessions      Session[]
+  readingList   UserBook[]
 }
 
 model Account {
@@ -35,15 +34,14 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -65,7 +63,7 @@ model VerificationToken {
 }
 
 model Book {
-  id            String   @id @default(cuid())
+  id            String     @id @default(cuid())
   title         String
   titleZh       String?
   author        String
@@ -76,14 +74,13 @@ model Book {
   genre         String?
   isbn          String?
   publishYear   Int?
-  isFeatured    Boolean  @default(false)
-  fileUrl       String?   // Vercel Blob URL to uploaded PDF / EPUB
-  fileType      String?   // "pdf" | "epub"
-  readLink      String?   // external reading URL (web link, Kindle store, etc.)
-  createdAt     DateTime @default(now())
-
-  posts     Post[]
-  userBooks UserBook[]
+  createdAt     DateTime   @default(now())
+  isFeatured    Boolean    @default(false)
+  fileType      String?
+  fileUrl       String?
+  readLink      String?
+  posts         Post[]
+  userBooks     UserBook[]
 }
 
 model UserBook {
@@ -98,27 +95,30 @@ model UserBook {
   endDate   DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, bookId])
+  @@index([userId, status])
 }
 
 model Post {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   bookId    String?
   content   String
-  type      String   @default("share")
+  type      String    @default("share")
   imageUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  comments  Comment[]
+  likes     Like[]
+  book      Book?     @relation(fields: [bookId], references: [id])
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  book     Book?     @relation(fields: [bookId], references: [id], onDelete: SetNull)
-  comments Comment[]
-  likes    Like[]
+  @@index([userId])
+  @@index([bookId])
+  @@index([createdAt])
 }
 
 model Comment {
@@ -127,31 +127,30 @@ model Comment {
   userId    String
   content   String
   createdAt DateTime @default(now())
-
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Genre {
   id        String   @id @default(cuid())
-  name      String   @unique       // canonical English name (used as FK string on Book)
-  nameZh    String?                // Chinese display name
-  order     Int      @default(0)   // display order
+  name      String   @unique
+  nameZh    String?
+  order     Int      @default(0)
   createdAt DateTime @default(now())
 }
 
 model ReadingLog {
   id        String   @id @default(cuid())
   userId    String
-  date      DateTime @db.Date  // date-only (no time); UTC midnight
+  date      DateTime @db.Date
   pages     Int      @default(1)
   note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date])
+  @@index([userId, date])
 }
 
 model Like {
@@ -159,9 +158,8 @@ model Like {
   postId    String
   userId    String
   createdAt DateTime @default(now())
-
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
 }
