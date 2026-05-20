@@ -317,14 +317,13 @@ function EpubReader({
   onTextExtracted: (text: string) => void;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [EpubView, setEpubView] = useState<React.ComponentType<any> | null>(null);
-  const [location, setLocation]   = useState<string | number>(0);
-  const [toc, setToc]             = useState<TocItem[]>([]);
-  const [showToc, setShowToc]     = useState(false);
+  const [EpubView, setEpubView]       = useState<React.ComponentType<any> | null>(null);
+  const [location, setLocation]       = useState<string | number>(0);
+  const [toc, setToc]                 = useState<TocItem[]>([]);
+  const [showToc, setShowToc]         = useState(false);
   const [chapterLabel, setChapterLabel] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renditionRef   = useRef<any>(null);
-  const touchStartXRef = useRef<number | null>(null);
+  const renditionRef = useRef<any>(null);
   const tc = THEMES[theme];
 
   useEffect(() => {
@@ -334,24 +333,14 @@ function EpubReader({
     });
   }, []);
 
-  // Re-apply theme/font when they change
+  // Re-apply theme/font whenever they change
   useEffect(() => {
-    if (!renditionRef.current) return;
-    renditionRef.current.themes.default({
-      body: {
-        color:      theme === "dark" ? "#f3f4f6" : theme === "sepia" ? "#451a03" : "#1f2937",
-        background: theme === "dark" ? "#030712" : theme === "sepia" ? "#fffbeb" : "#ffffff",
-        fontSize:   `${fontSize}px`,
-        lineHeight: "1.9",
-        padding:    "0 2rem",
-      },
-    });
+    applyTheme(renditionRef.current, theme, fontSize);
   }, [theme, fontSize]);
 
-  // Keyboard navigation (arrow keys)
+  // Keyboard: left/up = prev chapter, right/down = next chapter
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Don't intercept when typing in an input
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
       if (e.key === "ArrowRight" || e.key === "ArrowDown") renditionRef.current?.next();
       if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   renditionRef.current?.prev();
@@ -363,34 +352,25 @@ function EpubReader({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleGetRendition = useCallback((rendition: any) => {
     renditionRef.current = rendition;
-    // Apply initial theme + font
-    rendition.themes.default({
-      body: {
-        color:      theme === "dark" ? "#f3f4f6" : theme === "sepia" ? "#451a03" : "#1f2937",
-        background: theme === "dark" ? "#030712" : theme === "sepia" ? "#fffbeb" : "#ffffff",
-        fontSize:   `${fontSize}px`,
-        lineHeight: "1.9",
-        padding:    "0 2rem",
-      },
-    });
-    // Extract text for TTS + wire up swipe inside the iframe
+    applyTheme(rendition, theme, fontSize);
+
+    // Extract first page text for TTS
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rendition.hooks.content.register((contents: any) => {
       const bodyText = contents.document?.body?.innerText ?? "";
       if (bodyText) onTextExtracted(bodyText.slice(0, 8000));
+    });
 
-      // Touch-swipe navigation inside the epub iframe
-      let swipeStartX = 0;
-      contents.document.addEventListener("touchstart", (e: TouchEvent) => {
-        swipeStartX = e.touches[0].clientX;
-      }, { passive: true });
-      contents.document.addEventListener("touchend", (e: TouchEvent) => {
-        const dx = e.changedTouches[0].clientX - swipeStartX;
-        if (Math.abs(dx) > 40) {
-          if (dx > 0) renditionRef.current?.prev();
-          else        renditionRef.current?.next();
-        }
-      }, { passive: true });
+    // Track chapter label from location changes
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rendition.on("locationChanged", (loc: any) => {
+      if (!loc?.start?.href) return;
+      // walk flattened toc to find matching entry
+      const flat = flattenToc(renditionRef.current?.book?.navigation?.toc ?? []);
+      const match = flat.find(
+        (t) => loc.start.href.endsWith(t.href.split("#")[0])
+      );
+      if (match) setChapterLabel(match.label.trim());
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -401,28 +381,14 @@ function EpubReader({
     setShowToc(false);
   }, []);
 
-  /** Swipe on the outer container (outside the iframe) */
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartXRef.current = e.touches[0].clientX;
-  };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartXRef.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchStartXRef.current;
-    if (Math.abs(dx) > 40) {
-      if (dx > 0) renditionRef.current?.prev();
-      else        renditionRef.current?.next();
-    }
-    touchStartXRef.current = null;
-  };
-
-  /** Flatten nested TOC for rendering */
+  /** Flatten nested TOC items */
   const renderTocItems = (items: TocItem[], depth = 0): React.ReactNode =>
     items.map((item) => (
       <div key={item.href + item.label}>
         <button
           onClick={() => navigateTo(item.href, item.label)}
           className={`w-full text-left py-2 px-3 text-sm rounded-lg transition-colors hover:bg-gray-100 active:bg-gray-200 ${
-            depth > 0 ? "pl-6 text-gray-500" : "text-gray-800 font-medium"
+            depth > 0 ? "text-gray-500" : "text-gray-800 font-medium"
           }`}
           style={{ paddingLeft: `${0.75 + depth * 1}rem` }}
         >
@@ -433,95 +399,130 @@ function EpubReader({
     ));
 
   const bg = theme === "dark" ? "#030712" : theme === "sepia" ? "#fffbeb" : "#ffffff";
-  const navBtnBase =
-    "absolute top-0 bottom-0 z-10 flex items-center justify-center w-14 transition-opacity select-none";
+
+  // Bottom nav bar colours
+  const barBg     = theme === "dark" ? "bg-gray-900 border-gray-700"
+                  : theme === "sepia" ? "bg-amber-50 border-amber-200"
+                  : "bg-white border-gray-200";
+  const barBtn    = `flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${tc.text}
+                     hover:bg-black/5 active:bg-black/10 disabled:opacity-30 disabled:cursor-not-allowed`;
 
   if (!EpubView) return <Spinner tc={tc} locale={locale} />;
 
   return (
-    <div
-      className="relative"
-      style={{ height: "calc(100vh - 160px)", minHeight: "400px" }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* ── Prev page button ── */}
-      <button
-        onClick={() => renditionRef.current?.prev()}
-        title={locale === "zh" ? "上一页 (←)" : "Previous page (←)"}
-        className={`${navBtnBase} left-0 opacity-0 hover:opacity-100 bg-gradient-to-r from-black/8 to-transparent`}
-      >
-        <FiChevronLeft size={28} className="text-gray-600 drop-shadow" />
-      </button>
+    <div className="flex flex-col" style={{ height: "calc(100vh - 160px)", minHeight: "460px" }}>
 
-      {/* ── Next page button ── */}
-      <button
-        onClick={() => renditionRef.current?.next()}
-        title={locale === "zh" ? "下一页 (→)" : "Next page (→)"}
-        className={`${navBtnBase} right-0 opacity-0 hover:opacity-100 bg-gradient-to-l from-black/8 to-transparent`}
-      >
-        <FiChevronRight size={28} className="text-gray-600 drop-shadow" />
-      </button>
+      {/* ── TOC toggle button (floats top-left over iframe) ── */}
+      <div className="relative flex-1 min-h-0">
 
-      {/* ── TOC toggle button ── */}
-      <button
-        onClick={() => setShowToc(v => !v)}
-        title={locale === "zh" ? "目录" : "Table of Contents"}
-        className={`absolute top-2 left-16 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm border transition-colors ${
-          showToc
-            ? "bg-forest-600 text-white border-forest-600"
-            : "bg-white/90 text-gray-700 border-gray-200 hover:bg-white"
-        }`}
-      >
-        <FiBookOpen size={13} />
-        <span>{chapterLabel || (locale === "zh" ? "目录" : "Contents")}</span>
-      </button>
+        <button
+          onClick={() => setShowToc(v => !v)}
+          title={locale === "zh" ? "目录" : "Table of Contents"}
+          className={`absolute top-2 left-2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs
+                      font-semibold shadow-sm border transition-colors max-w-[60%] truncate ${
+            showToc
+              ? "bg-forest-600 text-white border-forest-600"
+              : "bg-white/90 text-gray-700 border-gray-200 hover:bg-white"
+          }`}
+        >
+          <FiBookOpen size={13} className="flex-shrink-0" />
+          <span className="truncate">{chapterLabel || (locale === "zh" ? "目录" : "Contents")}</span>
+        </button>
 
-      {/* ── TOC drawer ── */}
-      {showToc && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 z-20 bg-black/20"
-            onClick={() => setShowToc(false)}
+        {/* TOC drawer */}
+        {showToc && (
+          <>
+            <div className="absolute inset-0 z-20 bg-black/20" onClick={() => setShowToc(false)} />
+            <div className="absolute top-0 left-0 bottom-0 z-30 w-72 bg-white shadow-2xl overflow-y-auto flex flex-col">
+              <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+                <span className="font-semibold text-gray-900 text-sm">
+                  {locale === "zh" ? "目录" : "Contents"}
+                </span>
+                <button onClick={() => setShowToc(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded">✕</button>
+              </div>
+              <div className="flex-1 px-2 py-2">
+                {toc.length > 0
+                  ? renderTocItems(toc)
+                  : <p className="text-center text-gray-400 text-sm py-8">
+                      {locale === "zh" ? "暂无目录" : "No contents"}
+                    </p>
+                }
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── EPUB viewer — scrolled flow so full chapter text is visible ── */}
+        <div style={{ position: "absolute", inset: 0, background: bg }}>
+          <EpubView
+            url={url}
+            location={location}
+            locationChanged={(loc: string) => setLocation(loc)}
+            tocChanged={(t: TocItem[]) => setToc(t)}
+            getRendition={handleGetRendition}
+            epubOptions={{ flow: "scrolled", manager: "continuous" }}
+            loadingView={<Spinner tc={tc} locale={locale} />}
           />
-          {/* Panel */}
-          <div className="absolute top-0 left-0 bottom-0 z-30 w-72 bg-white shadow-2xl overflow-y-auto flex flex-col">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-              <span className="font-semibold text-gray-900 text-sm">
-                {locale === "zh" ? "目录" : "Contents"}
-              </span>
-              <button
-                onClick={() => setShowToc(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded"
-              >✕</button>
-            </div>
-            <div className="flex-1 px-2 py-2">
-              {toc.length > 0
-                ? renderTocItems(toc)
-                : <p className="text-center text-gray-400 text-sm py-8">
-                    {locale === "zh" ? "暂无目录" : "No contents"}
-                  </p>
-              }
-            </div>
-          </div>
-        </>
-      )}
+        </div>
+      </div>
 
-      {/* ── EPUB viewer ── */}
-      <div style={{ position: "absolute", inset: 0, background: bg }}>
-        <EpubView
-          url={url}
-          location={location}
-          locationChanged={(loc: string) => setLocation(loc)}
-          tocChanged={(t: TocItem[]) => setToc(t)}
-          getRendition={handleGetRendition}
-          epubOptions={{ flow: "paginated", manager: "default" }}
-          loadingView={<Spinner tc={tc} locale={locale} />}
-        />
+      {/* ── Chapter navigation bar (always visible) ── */}
+      <div className={`flex-shrink-0 flex items-center justify-between border-t px-3 py-2 ${barBg}`}>
+        <button
+          className={barBtn}
+          onClick={() => renditionRef.current?.prev()}
+          title={locale === "zh" ? "上一章 (←)" : "Prev chapter (←)"}
+        >
+          <FiChevronLeft size={16} />
+          <span>{locale === "zh" ? "上一章" : "Prev"}</span>
+        </button>
+
+        <span className={`text-xs ${tc.text} opacity-50 px-2 truncate max-w-[50%] text-center`}>
+          {chapterLabel || (locale === "zh" ? "滚动阅读全文" : "Scroll to read")}
+        </span>
+
+        <button
+          className={barBtn}
+          onClick={() => renditionRef.current?.next()}
+          title={locale === "zh" ? "下一章 (→)" : "Next chapter (→)"}
+        >
+          <span>{locale === "zh" ? "下一章" : "Next"}</span>
+          <FiChevronRight size={16} />
+        </button>
       </div>
     </div>
   );
+}
+
+/** Apply theme + font to an epub.js rendition */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyTheme(rendition: any, theme: Theme, fontSize: number) {
+  if (!rendition) return;
+  rendition.themes.default({
+    "html, body": {
+      color:      theme === "dark" ? "#f3f4f6" : theme === "sepia" ? "#451a03" : "#1f2937",
+      background: theme === "dark" ? "#030712" : theme === "sepia" ? "#fffbeb" : "#ffffff",
+      fontSize:   `${fontSize}px`,
+      lineHeight: "1.9",
+      padding:    "1rem 2rem 3rem",
+      margin:     "0",
+      maxWidth:   "100%",
+    },
+    "p, li, div": {
+      maxWidth: "100%",
+      wordBreak: "break-word",
+    },
+  });
+}
+
+/** Flatten nested TOC tree into a flat array */
+function flattenToc(items: TocItem[]): TocItem[] {
+  const result: TocItem[] = [];
+  for (const item of items) {
+    result.push(item);
+    if (item.subitems?.length) result.push(...flattenToc(item.subitems));
+  }
+  return result;
 }
 
 // ─── External Link View ───────────────────────────────────────────────────────
